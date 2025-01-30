@@ -1,0 +1,19 @@
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: white;
+    border-bottom: 2px solid black;
+}
+
+.logo img {
+    height: 40px;
+}
+
+.user-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-weight: bold;
+}

@@ -1,0 +1,78 @@
+.gestion-utilisateurs-container {
+    padding: 20px;
+}
+
+.add-user-btn {
+    background-color: #008080;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    cursor: pointer;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.active {
+    color: green;
+    font-weight: bold;
+}
+
+.inactive {
+    color: red;
+    font-weight: bold;
+}
+
+.edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.gestion-utilisateurs-container {
+    padding: 20px;
+}
+
+
+mat-form-field {
+    width: 250px;
+}
+
+
+
+.inactive {
+    color: red;
+    font-weight: bold;
+}
+
+button {
+    cursor: pointer;
+}
+
+.gestion-utilisateurs-container {
+    padding: 20px;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.active {
+    color: green;
+    font-weight: bold;
+}
