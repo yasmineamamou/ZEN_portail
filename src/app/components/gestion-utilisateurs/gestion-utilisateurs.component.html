@@ -1,10 +1,11 @@
 <div class="gestion-utilisateurs-container">
     <!-- Actions (Add User, Select All, Filter, Search) -->
     <div class="actions">
-        <button mat-button color="primary">+ AJOUTER UTILISATEUR</button>
+        <button mat-button color="primary" (click)="toggleUserForm()">+ AJOUTER UTILISATEUR</button>
         <button mat-button color="primary" (click)="toggleSelectAllUsers()">
             {{ allSelected ? 'Désélectionner Tous' : 'Sélectionner Tous' }}
         </button>
+
 
         <!-- Filter Dropdown -->
         <mat-form-field appearance="outline">
@@ -21,102 +22,165 @@
             <mat-label>Rechercher ...</mat-label>
             <input matInput (keyup)="applyFilter($event)">
         </mat-form-field>
+        <div *ngIf="showUserForm" class="full-page-overlay">
+            <div class="user-form">
+                <button class="close-button" (click)="toggleUserForm()">✖</button>
+                <h2>Nouveau Utilisateur</h2>
+                <form>
+                    <div class="form-group">
+                        <label>Profil*</label>
+                        <mat-radio-group>
+                            <mat-radio-button value="admin">Admin</mat-radio-button>
+                            <mat-radio-button value="client">Client</mat-radio-button>
+                            <mat-radio-button value="super-admin">Super Admin</mat-radio-button>
+                        </mat-radio-group>
+                    </div>
+
+                    <div class="form-fields">
+                        <mat-form-field appearance="outline">
+                            <mat-label>Nom et Prénom*</mat-label>
+                            <input matInput>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>E-Mail*</mat-label>
+                            <input matInput type="email">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Mot de Passe*</mat-label>
+                            <input matInput type="password">
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Société*</mat-label>
+                            <input matInput>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Poste*</mat-label>
+                            <input matInput>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Département*</mat-label>
+                            <input matInput>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Unité*</mat-label>
+                            <input matInput>
+                        </mat-form-field>
+
+                        <mat-form-field appearance="outline">
+                            <mat-label>Menu de Cube</mat-label>
+                            <input matInput>
+                        </mat-form-field>
+
+                        <mat-slide-toggle>Activé</mat-slide-toggle>
+                    </div>
+
+                    <button mat-raised-button color="primary">ENREGISTRER</button>
+                </form>
+            </div>
+        </div>
     </div>
+</div>
 
-    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+<table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
 
-        <!-- Select Column -->
-        <!-- Select Column -->
-        <ng-container matColumnDef="select">
-            <th mat-header-cell *matHeaderCellDef> </th>
-            <td mat-cell *matCellDef="let user">
-                <mat-checkbox [checked]="selectedUsers.has(user.id)" (change)="toggleSelection(user.id)"></mat-checkbox>
-            </td>
-        </ng-container>
+    <!-- Select Column -->
+    <!-- Select Column -->
+    <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef> </th>
+        <td mat-cell *matCellDef="let user">
+            <mat-checkbox [checked]="selectedUsers.has(user.id)" (change)="toggleSelection(user.id)"></mat-checkbox>
+        </td>
+    </ng-container>
 
 
 
-        <!-- Name Column -->
-        <ng-container matColumnDef="name">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom et Prénom</th>
-            <td mat-cell *matCellDef="let user">{{ user.name }}</td>
-        </ng-container>
+    <!-- Name Column -->
+    <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom et Prénom</th>
+        <td mat-cell *matCellDef="let user">{{ user.name }}</td>
+    </ng-container>
 
-        <!-- Email Column -->
-        <ng-container matColumnDef="email">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>E-Mail</th>
-            <td mat-cell *matCellDef="let user">{{ user.email }}</td>
-        </ng-container>
+    <!-- Email Column -->
+    <ng-container matColumnDef="email">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>E-Mail</th>
+        <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+    </ng-container>
 
-        <!-- Password Column -->
-        <ng-container matColumnDef="password">
-            <th mat-header-cell *matHeaderCellDef>Mot de Passe</th>
-            <td mat-cell *matCellDef="let user">{{ user.password }}</td>
-        </ng-container>
+    <!-- Password Column -->
+    <ng-container matColumnDef="password">
+        <th mat-header-cell *matHeaderCellDef>Mot de Passe</th>
+        <td mat-cell *matCellDef="let user">{{ user.password }}</td>
+    </ng-container>
 
-        <!-- Société Column -->
-        <ng-container matColumnDef="societe">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Société</th>
-            <td mat-cell *matCellDef="let user">{{ user.societe }}</td>
-        </ng-container>
+    <!-- Société Column -->
+    <ng-container matColumnDef="societe">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Société</th>
+        <td mat-cell *matCellDef="let user">{{ user.societe }}</td>
+    </ng-container>
 
-        <!-- ✅ Unite Column (Fixing the missing column error) -->
-        <ng-container matColumnDef="unite">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Unité</th>
-            <td mat-cell *matCellDef="let user">{{ user.unite }}</td>
-        </ng-container>
+    <!-- ✅ Unite Column (Fixing the missing column error) -->
+    <ng-container matColumnDef="unite">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Unité</th>
+        <td mat-cell *matCellDef="let user">{{ user.unite }}</td>
+    </ng-container>
 
-        <!-- Poste Column -->
-        <ng-container matColumnDef="poste">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Poste</th>
-            <td mat-cell *matCellDef="let user">{{ user.poste }}</td>
-        </ng-container>
+    <!-- Poste Column -->
+    <ng-container matColumnDef="poste">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Poste</th>
+        <td mat-cell *matCellDef="let user">{{ user.poste }}</td>
+    </ng-container>
 
-        <!-- Département Column -->
-        <ng-container matColumnDef="departement">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Département</th>
-            <td mat-cell *matCellDef="let user">{{ user.departement }}</td>
-        </ng-container>
+    <!-- Département Column -->
+    <ng-container matColumnDef="departement">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Département</th>
+        <td mat-cell *matCellDef="let user">{{ user.departement }}</td>
+    </ng-container>
 
-        <!-- Menu de Cube Column -->
-        <ng-container matColumnDef="menu_cube">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Menu de Cube</th>
-            <td mat-cell *matCellDef="let user">{{ user.menu_cube }}</td>
-        </ng-container>
+    <!-- Menu de Cube Column -->
+    <ng-container matColumnDef="menu_cube">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Menu de Cube</th>
+        <td mat-cell *matCellDef="let user">{{ user.menu_cube }}</td>
+    </ng-container>
 
-        <!-- Date de Création Column -->
-        <ng-container matColumnDef="date_creation">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Date de Création</th>
-            <td mat-cell *matCellDef="let user">{{ user.date_creation | date:'dd/MM/yyyy' }}</td>
-        </ng-container>
+    <!-- Date de Création Column -->
+    <ng-container matColumnDef="date_creation">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Date de Création</th>
+        <td mat-cell *matCellDef="let user">{{ user.date_creation | date:'dd/MM/yyyy' }}</td>
+    </ng-container>
 
-        <!-- Status Column -->
-        <ng-container matColumnDef="status">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
-            <td mat-cell *matCellDef="let user">
-                <span [ngClass]="{ 'active': user.status === 'Activé', 'inactive': user.status === 'Désactivé' }">
-                    {{ user.status }}
-                </span>
-            </td>
-        </ng-container>
+    <!-- Status Column -->
+    <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
+        <td mat-cell *matCellDef="let user">
+            <span [ngClass]="{ 'active': user.status === 'Activé', 'inactive': user.status === 'Désactivé' }">
+                {{ user.status }}
+            </span>
+        </td>
+    </ng-container>
 
-        <!-- Actions Column -->
-        <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef>Actions</th>
-            <td mat-cell *matCellDef="let user">
-                <button mat-icon-button color="primary" (click)="editUser(user)">
-                    <mat-icon>edit</mat-icon>
-                </button>
-                <button mat-icon-button color="warn" (click)="deleteUser(user.id)">
-                    <mat-icon>delete</mat-icon>
-                </button>
-            </td>
-        </ng-container>
+    <!-- Actions Column -->
+    <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let user">
+            <button mat-icon-button color="primary" (click)="editUser(user)">
+                <mat-icon>edit</mat-icon>
+            </button>
+            <button mat-icon-button color="warn" (click)="deleteUser(user.id)">
+                <mat-icon>delete</mat-icon>
+            </button>
+        </td>
+    </ng-container>
 
-        <!-- Render Header and Rows -->
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-    </table>
+    <!-- Render Header and Rows -->
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+</table>
 
-    <!-- Paginator -->
-    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+<!-- Paginator -->
+<mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>

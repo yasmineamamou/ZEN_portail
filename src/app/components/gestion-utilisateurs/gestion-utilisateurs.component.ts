@@ -13,12 +13,16 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatRadioModule } from '@angular/material/radio';
 
 @Component({
   selector: 'app-gestion-utilisateurs',
   standalone: true,
   imports: [
     FormsModule,
+    MatSlideToggleModule,
+    MatRadioModule,
     CommonModule,
     MatPaginatorModule,
     MatTableModule,
@@ -42,6 +46,7 @@ export class GestionUtilisateursComponent implements OnInit {
   selectedUsers: Set<number> = new Set();
   statusFilter: string = '';
   allSelected = false;
+  showUserForm = false;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -58,6 +63,9 @@ export class GestionUtilisateursComponent implements OnInit {
       this.dataSource.paginator = this.paginator;
       this.dataSource.sort = this.sort;
     });
+  }
+  toggleUserForm() {
+    this.showUserForm = !this.showUserForm; // ✅ Show/Hide form
   }
   applyFilter(event: Event) {
     const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
