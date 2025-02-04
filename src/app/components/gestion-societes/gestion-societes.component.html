@@ -1,0 +1,96 @@
+<div class="gestion-utilisateurs-container">
+    <!-- Actions (Add Société Button) -->
+    <div class="actions">
+        <button class="add-user-btn" (click)="openAddSocieteForm()">+ AJOUTER SOCIÉTÉ</button>
+    </div>
+
+    <!-- Add Société Modal -->
+    <div *ngIf="showAddSocieteForm" class="full-page-overlay" (click)="closeAddSocieteForm($event)">
+        <div class="user-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Gestion Des Sociétés: </h2>
+            <form #addSocieteForm="ngForm" (ngSubmit)="onAddSociete()" novalidate>
+                <div class="form-container">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="custom-label">NOM DE SOCIÉTÉ: *</label>
+                            <input type="text" [(ngModel)]="newSociete.nom" name="nom" required class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">DESCRIPTION:</label>
+                            <textarea [(ngModel)]="newSociete.description" name="description"
+                                class="custom-input"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button mat-raised-button class="submit-button" type="submit"
+                            [disabled]="addSocieteForm.invalid">
+                            AJOUTER
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Société Modal -->
+    <div *ngIf="showEditSocieteForm" class="full-page-overlay" (click)="closeEditSocieteForm($event)">
+        <div class="user-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Modifier Société</h2>
+            <form #editSocieteForm="ngForm" (ngSubmit)="onEditSociete()" novalidate>
+                <div class="form-container">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="custom-label">NOM DE SOCIÉTÉ: *</label>
+                            <input type="text" [(ngModel)]="selectedSociete.nom" name="nom" required
+                                class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">DESCRIPTION:</label>
+                            <textarea [(ngModel)]="selectedSociete.description" name="description"
+                                class="custom-input"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button mat-raised-button class="submit-button" type="submit"
+                            [disabled]="editSocieteForm.invalid">
+                            MODIFIER
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table for Sociétés -->
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+        <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom</th>
+            <td mat-cell *matCellDef="let societe"> {{ societe.nom }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+            <td mat-cell *matCellDef="let societe" class="description-column">
+                <span>{{ societe.description }}</span>
+                <span class="actions-container">
+                    <button mat-icon-button color="primary" (click)="openEditSocieteForm(societe)">
+                        <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="deleteSociete(societe.id)">
+                        <mat-icon>delete</mat-icon>
+                    </button>
+                </span>
+            </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+
+    <!-- Paginator -->
+    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+</div>

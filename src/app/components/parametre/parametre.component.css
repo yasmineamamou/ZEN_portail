@@ -3,6 +3,7 @@
     justify-content: center;
     align-items: center;
     height: 80vh;
+    padding-top: 40px;
 }
 
 .menu-grid {
@@ -11,6 +12,12 @@
     gap: 20px;
     width: fit-content;
     text-align: center;
+}
+
+.menu-item:hover {
+    background-color: #64bebc !important;
+    color: black !important;
+    transition: background-color 0.3s ease;
 }
 
 .menu-item {

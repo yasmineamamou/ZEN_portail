@@ -1,12 +1,11 @@
 <div class="gestion-utilisateurs-container">
     <!-- Actions (Add User, Select All, Filter, Search) -->
     <div class="actions">
-        <button mat-button color="primary" (click)="toggleUserForm()">+ AJOUTER UTILISATEUR</button>
-        <button mat-button color="primary" (click)="toggleSelectAllUsers()">
+        <button class="add-user-btn" (click)="toggleUserForm()">+ AJOUTER
+            UTILISATEUR</button>
+        <button mat-button (click)="toggleSelectAllUsers()">
             {{ allSelected ? 'Désélectionner Tous' : 'Sélectionner Tous' }}
         </button>
-
-
         <!-- Filter Dropdown -->
         <mat-form-field appearance="outline">
             <mat-label>Filtrer Par:</mat-label>
@@ -22,165 +21,274 @@
             <mat-label>Rechercher ...</mat-label>
             <input matInput (keyup)="applyFilter($event)">
         </mat-form-field>
-        <div *ngIf="showUserForm" class="full-page-overlay">
-            <div class="user-form">
-                <button class="close-button" (click)="toggleUserForm()">✖</button>
-                <h2>Nouveau Utilisateur</h2>
-                <form>
-                    <div class="form-group">
-                        <label>Profil*</label>
-                        <mat-radio-group>
-                            <mat-radio-button value="admin">Admin</mat-radio-button>
-                            <mat-radio-button value="client">Client</mat-radio-button>
-                            <mat-radio-button value="super-admin">Super Admin</mat-radio-button>
-                        </mat-radio-group>
+        <div *ngIf="showUserForm" class="full-page-overlay" (click)="closeUserForm($event)">
+            <div class="user-form" (click)="$event.stopPropagation()">
+                <form [formGroup]="userForm" (ngSubmit)="onSubmit()">
+                    <div class="profile-section">
+                        <!-- Left: Profile Selection -->
+                        <div class="profile-selection-container">
+                            <label class="form-label" style="font-weight: bold;">PROFIL* :</label>
+                            <mat-radio-group formControlName="profil" class="radio-group">
+                                <mat-radio-button value="admin">ADMIN</mat-radio-button>
+                                <mat-radio-button value="client">CLIENT</mat-radio-button>
+                                <mat-radio-button value="super-admin">SUPER ADMIN</mat-radio-button>
+                            </mat-radio-group>
+                            <div *ngIf="userForm.controls['profil'].invalid && userForm.controls['profil'].touched"
+                                class="error-message">
+                                Sélectionnez un profil.
+                            </div>
+                        </div>
+
+                        <!-- Right: Profile Picture -->
+                        <div class="profile-picture-container" (click)="fileInput.click()">
+                            <ng-container *ngIf="imagePreview || selectedUser?.profilePicture; else defaultIcon">
+                                <img [src]="imagePreview || selectedUser?.profilePicture" class="profile-picture"
+                                    alt="Profile Picture">
+                            </ng-container>
+
+                            <ng-template #defaultIcon>
+                                <svg class="default-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                    fill="gray">
+                                    <path
+                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08s5.97 1.09 6 3.08c-1.29 1.94-3.5 3.22-6 3.22z" />
+                                </svg>
+                            </ng-template>
+
+                            <input type="file" (change)="onFileSelected($event)" accept="image/*" hidden #fileInput>
+                        </div>
+
                     </div>
+                    <div class="form-container">
+                        <div class="form-grid">
+                            <!-- Row 1 -->
+                            <div class="form-group">
+                                <label class="custom-label">NOM ET PRÉNOM*</label>
+                                <input matInput formControlName="name" required class="custom-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="custom-label">E-MAIL*</label>
+                                <input matInput type="email" formControlName="email" required class="custom-input">
+                            </div>
 
-                    <div class="form-fields">
-                        <mat-form-field appearance="outline">
-                            <mat-label>Nom et Prénom*</mat-label>
-                            <input matInput>
-                        </mat-form-field>
+                            <!-- Row 2 -->
+                            <div class="form-group">
+                                <label class="custom-label">MOT DE PASSE*</label>
+                                <input matInput type="password" formControlName="password" required
+                                    class="custom-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="custom-label">SOCIÉTÉ*</label>
+                                <select formControlName="societe" required class="custom-select">
+                                    <option value="zen">ZEN Group</option>
+                                </select>
+                            </div>
 
-                        <mat-form-field appearance="outline">
-                            <mat-label>E-Mail*</mat-label>
-                            <input matInput type="email">
-                        </mat-form-field>
+                            <!-- Row 3 -->
+                            <div class="form-group">
+                                <label class="custom-label">POSTE*</label>
+                                <input matInput formControlName="poste" required class="custom-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="custom-label">DÉPARTEMENT*</label>
+                                <select formControlName="departement" required class="custom-select">
+                                    <option value="rh">RH</option>
+                                    <option value="commercial">Commercial</option>
+                                </select>
+                            </div>
 
-                        <mat-form-field appearance="outline">
-                            <mat-label>Mot de Passe*</mat-label>
-                            <input matInput type="password">
-                        </mat-form-field>
+                            <!-- Row 4 -->
+                            <div class="form-group">
+                                <label class="custom-label">UNITÉ*</label>
+                                <input matInput formControlName="unite" required class="custom-input">
+                            </div>
+                            <div class="form-group">
+                                <label class="custom-label">MENU DE CUBE</label>
+                                <select formControlName="menuCube" class="custom-select">
+                                    <option value="option1">Option 1</option>
+                                </select>
+                            </div>
+                        </div>
 
-                        <mat-form-field appearance="outline">
-                            <mat-label>Société*</mat-label>
-                            <input matInput>
-                        </mat-form-field>
+                        <!-- Activation Toggle -->
+                        <div class="activation-section">
+                            <label class="custom-label">ACTIVÉ* :</label>
+                            <mat-slide-toggle formControlName="active"></mat-slide-toggle>
+                        </div>
 
-                        <mat-form-field appearance="outline">
-                            <mat-label>Poste*</mat-label>
-                            <input matInput>
-                        </mat-form-field>
-
-                        <mat-form-field appearance="outline">
-                            <mat-label>Département*</mat-label>
-                            <input matInput>
-                        </mat-form-field>
-
-                        <mat-form-field appearance="outline">
-                            <mat-label>Unité*</mat-label>
-                            <input matInput>
-                        </mat-form-field>
-
-                        <mat-form-field appearance="outline">
-                            <mat-label>Menu de Cube</mat-label>
-                            <input matInput>
-                        </mat-form-field>
-
-                        <mat-slide-toggle>Activé</mat-slide-toggle>
+                        <!-- Submit Button -->
+                        <div class="submit-section">
+                            <button mat-raised-button class="submit-button" type="submit"
+                                [disabled]="userForm.invalid">ENREGISTRER</button>
+                        </div>
                     </div>
-
-                    <button mat-raised-button color="primary">ENREGISTRER</button>
                 </form>
             </div>
         </div>
     </div>
-</div>
+    <!-- Edit User Modal (Appears on Edit Button Click) -->
+    <div *ngIf="showEditForm" class="full-page-overlay" (click)="closeEditForm($event)">
+        <div class="user-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Modifier Utilisateur</h2>
 
-<table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+            <form [formGroup]="userForm" (ngSubmit)="onUpdateUser()">
+                <div class="profile-section">
+                    <!-- Left: Profile Selection -->
+                    <div class="profile-selection-container">
+                        <label class="form-label">PROFIL* :</label>
+                        <mat-radio-group formControlName="profil" class="radio-group">
+                            <mat-radio-button value="admin">ADMIN</mat-radio-button>
+                            <mat-radio-button value="client">CLIENT</mat-radio-button>
+                            <mat-radio-button value="super-admin">SUPER ADMIN</mat-radio-button>
+                        </mat-radio-group>
+                    </div>
 
-    <!-- Select Column -->
-    <!-- Select Column -->
-    <ng-container matColumnDef="select">
-        <th mat-header-cell *matHeaderCellDef> </th>
-        <td mat-cell *matCellDef="let user">
-            <mat-checkbox [checked]="selectedUsers.has(user.id)" (change)="toggleSelection(user.id)"></mat-checkbox>
-        </td>
-    </ng-container>
+                    <!-- Right: Profile Picture -->
+                    <div class="profile-picture-container">
+                        <img [src]="imagePreview || selectedUser?.profilePicture || 'assets/default-avatar.png'"
+                            class="profile-picture" alt="Profile Picture">
+                        <input type="file" (change)="onFileSelected($event)" accept="image/*" hidden #fileInput>
+                        <button type="button" mat-stroked-button (click)="fileInput.click()">Changer Photo</button>
+                    </div>
+                </div>
 
+                <div class="form-container">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="custom-label">NOM ET PRÉNOM*</label>
+                            <input matInput formControlName="name" required class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">E-MAIL*</label>
+                            <input matInput type="email" formControlName="email" required class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">MOT DE PASSE*</label>
+                            <input matInput type="password" formControlName="password" required class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">SOCIÉTÉ*</label>
+                            <select formControlName="societe" required class="custom-select">
+                                <option value="zen">ZEN Group</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">POSTE*</label>
+                            <input matInput formControlName="poste" required class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">DÉPARTEMENT*</label>
+                            <select formControlName="departement" required class="custom-select">
+                                <option value="rh">RH</option>
+                                <option value="commercial">Commercial</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">UNITÉ*</label>
+                            <input matInput formControlName="unite" required class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">MENU DE CUBE</label>
+                            <select formControlName="menuCube" class="custom-select">
+                                <option value="option1">Option 1</option>
+                            </select>
+                        </div>
+                    </div>
 
+                    <!-- Activation Toggle -->
+                    <div class="activation-section">
+                        <label class="custom-label">ACTIVÉ* :</label>
+                        <mat-slide-toggle formControlName="active"></mat-slide-toggle>
+                    </div>
 
-    <!-- Name Column -->
-    <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom et Prénom</th>
-        <td mat-cell *matCellDef="let user">{{ user.name }}</td>
-    </ng-container>
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button mat-raised-button class="submit-button" type="submit" [disabled]="userForm.invalid">
+                            MODIFIER
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 
-    <!-- Email Column -->
-    <ng-container matColumnDef="email">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>E-Mail</th>
-        <td mat-cell *matCellDef="let user">{{ user.email }}</td>
-    </ng-container>
-
-    <!-- Password Column -->
-    <ng-container matColumnDef="password">
-        <th mat-header-cell *matHeaderCellDef>Mot de Passe</th>
-        <td mat-cell *matCellDef="let user">{{ user.password }}</td>
-    </ng-container>
-
-    <!-- Société Column -->
-    <ng-container matColumnDef="societe">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Société</th>
-        <td mat-cell *matCellDef="let user">{{ user.societe }}</td>
-    </ng-container>
-
-    <!-- ✅ Unite Column (Fixing the missing column error) -->
-    <ng-container matColumnDef="unite">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Unité</th>
-        <td mat-cell *matCellDef="let user">{{ user.unite }}</td>
-    </ng-container>
-
-    <!-- Poste Column -->
-    <ng-container matColumnDef="poste">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Poste</th>
-        <td mat-cell *matCellDef="let user">{{ user.poste }}</td>
-    </ng-container>
-
-    <!-- Département Column -->
-    <ng-container matColumnDef="departement">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Département</th>
-        <td mat-cell *matCellDef="let user">{{ user.departement }}</td>
-    </ng-container>
-
-    <!-- Menu de Cube Column -->
-    <ng-container matColumnDef="menu_cube">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Menu de Cube</th>
-        <td mat-cell *matCellDef="let user">{{ user.menu_cube }}</td>
-    </ng-container>
-
-    <!-- Date de Création Column -->
-    <ng-container matColumnDef="date_creation">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Date de Création</th>
-        <td mat-cell *matCellDef="let user">{{ user.date_creation | date:'dd/MM/yyyy' }}</td>
-    </ng-container>
-
-    <!-- Status Column -->
-    <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
-        <td mat-cell *matCellDef="let user">
-            <span [ngClass]="{ 'active': user.status === 'Activé', 'inactive': user.status === 'Désactivé' }">
-                {{ user.status }}
-            </span>
-        </td>
-    </ng-container>
-
-    <!-- Actions Column -->
-    <ng-container matColumnDef="actions">
-        <th mat-header-cell *matHeaderCellDef>Actions</th>
-        <td mat-cell *matCellDef="let user">
-            <button mat-icon-button color="primary" (click)="editUser(user)">
-                <mat-icon>edit</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="deleteUser(user.id)">
-                <mat-icon>delete</mat-icon>
-            </button>
-        </td>
-    </ng-container>
-
-    <!-- Render Header and Rows -->
-    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-</table>
-
-<!-- Paginator -->
-<mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+        <ng-container matColumnDef="select">
+            <th mat-header-cell *matHeaderCellDef> </th>
+            <td mat-cell *matCellDef="let user">
+                <mat-checkbox [checked]="selectedUsers.has(user.id)" (change)="toggleSelection(user.id)"></mat-checkbox>
+            </td>
+        </ng-container>
+        <!-- Name Column -->
+        <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom et Prénom</th>
+            <td mat-cell *matCellDef="let user"> {{ user.name }}</td>
+            <!-- <img [src]="'http://localhost:3000' + user.profilePicture"
+                    class="user-table-picture" alt="Profile Picture">-->
+        </ng-container>
+        <!-- Email Column -->
+        <ng-container matColumnDef="email">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>E-Mail</th>
+            <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+        </ng-container>
+        <!-- Password Column -->
+        <ng-container matColumnDef="password">
+            <th mat-header-cell *matHeaderCellDef>Mot de Passe</th>
+            <td mat-cell *matCellDef="let user">{{ user.password }}</td>
+        </ng-container>
+        <!-- Société Column -->
+        <ng-container matColumnDef="societe">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Société</th>
+            <td mat-cell *matCellDef="let user">{{ user.societe }}</td>
+        </ng-container>
+        <!-- ✅ Unite Column (Fixing the missing column error) -->
+        <ng-container matColumnDef="unite">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Unité</th>
+            <td mat-cell *matCellDef="let user">{{ user.unite }}</td>
+        </ng-container>
+        <!-- Poste Column -->
+        <ng-container matColumnDef="poste">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Poste</th>
+            <td mat-cell *matCellDef="let user">{{ user.poste }}</td>
+        </ng-container>
+        <!-- Département Column -->
+        <ng-container matColumnDef="departement">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Département</th>
+            <td mat-cell *matCellDef="let user">{{ user.departement }}</td>
+        </ng-container>
+        <!-- Menu de Cube Column -->
+        <ng-container matColumnDef="menu_cube">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Menu de Cube</th>
+            <td mat-cell *matCellDef="let user">{{ user.menu_cube }}</td>
+        </ng-container>
+        <!-- Date de Création Column -->
+        <ng-container matColumnDef="date_creation">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Date de Création</th>
+            <td mat-cell *matCellDef="let user">{{ user.date_creation | date:'dd/MM/yyyy' }}</td>
+        </ng-container>
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
+            <td mat-cell *matCellDef="let user">
+                <span [ngClass]="{ 'active': user.status === 'Activé', 'inactive': user.status === 'Désactivé' }">
+                    {{ user.status }}
+                </span>
+            </td>
+        </ng-container>
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let user">
+                <button mat-icon-button color="primary" (click)="editUser(user)">
+                    <mat-icon>edit</mat-icon>
+                </button>
+                <!--<button mat-icon-button color="warn" (click)="deleteUser(user.id)">
+                    <mat-icon>delete</mat-icon>
+                </button>-->
+            </td>
+        </ng-container>
+        <!-- Render Header and Rows -->
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+    <!-- Paginator -->
+    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>

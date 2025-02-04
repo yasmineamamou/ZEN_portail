@@ -17,6 +17,12 @@
     /* Space between rows */
 }
 
+.menu-item:hover {
+    background-color: #64bebc !important;
+    color: black !important;
+    transition: background-color 0.3s ease;
+}
+
 /* Styling for each menu item */
 .menu-item {
     background-color: #008080;

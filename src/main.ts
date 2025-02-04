@@ -4,11 +4,16 @@ import { provideAnimations } from '@angular/platform-browser/animations'; // ✅
 import { AppComponent } from './app/app.component';
 import { provideRouter } from '@angular/router';
 import { routes } from './app/app.routes';
+import { ReactiveFormsModule } from '@angular/forms';
+import { importProvidersFrom } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 
 bootstrapApplication(AppComponent, {
   providers: [
     provideRouter(routes),
     provideHttpClient(withFetch()),
-    provideAnimations() // ✅ Fix animation-related errors
+    provideAnimations(),
+    importProvidersFrom(ReactiveFormsModule, FormsModule, CommonModule)
   ]
 });
