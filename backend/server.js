@@ -49,6 +49,7 @@ app.listen(port, () => {
 });
 const upload = multer({ storage });
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Add a user
 app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
     console.log('Received Data:', req.body); // Debugging Log
@@ -103,6 +104,7 @@ app.get('/api/users', async (req, res) => {
         res.status(500).json({ error: 'Database error', details: err.message });
     }
 });
+
 // Delete User API
 app.delete('/api/users/:id', async (req, res) => {
     try {
@@ -113,6 +115,7 @@ app.delete('/api/users/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 app.put('/api/users/:id', async (req, res) => {
     try {
         const userId = req.params.id;
@@ -145,6 +148,7 @@ app.put('/api/users/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to update user', details: err.message });
     }
 });
+
 app.get('/api/societes', async (req, res) => {
     try {
         const result = await sql.query('SELECT * FROM Societe');
@@ -153,6 +157,7 @@ app.get('/api/societes', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 app.post('/api/societes', async (req, res) => {
     try {
         const { nom, description } = req.body;
@@ -171,6 +176,7 @@ app.post('/api/societes', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 app.delete('/api/societes/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -180,6 +186,7 @@ app.delete('/api/societes/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
 app.put('/api/societes/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -220,6 +227,7 @@ app.get('/api/departements', async (req, res) => {
         res.status(500).json({ error: 'Database error', details: err.message });
     }
 });
+
 app.post('/api/departements', async (req, res) => {
     try {
         const { nom, description, societe_id } = req.body;
@@ -281,12 +289,67 @@ app.put('/api/departements/:id', async (req, res) => {
     }
 });
 
-
 app.delete('/api/departements/:id', async (req, res) => {
     try {
         await sql.query`DELETE FROM Departement WHERE id = ${req.params.id}`;
         res.json({ message: 'Département supprimé avec succès' });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/unites', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query('SELECT * FROM unites');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Get unite by ID
+app.get('/unites/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query(`SELECT * FROM unites WHERE id = ${req.params.id}`);
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Add unite
+app.post('/unites', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`INSERT INTO unites (nom, description) VALUES ('${nom}', '${description}')`);
+        res.status(201).json({ message: 'Unite added successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Update unite
+app.put('/unites/:id', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`UPDATE unites SET nom = '${nom}', description = '${description}' WHERE id = ${req.params.id}`);
+        res.json({ message: 'Unite updated successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Delete unite
+app.delete('/unites/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        await sql.query(`DELETE FROM unites WHERE id = ${req.params.id}`);
+        res.json({ message: 'Unite deleted successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
     }
 });

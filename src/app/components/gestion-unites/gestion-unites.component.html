@@ -1,1 +1,6 @@
-<p>gestion-unites works!</p>
+<h2>Unites List</h2>
+<ul>
+    <li *ngFor="let unite of unites">
+        {{ unite.nom }} - {{ unite.description }}
+    </li>
+</ul>
