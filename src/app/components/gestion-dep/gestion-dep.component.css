@@ -1,0 +1,200 @@
+.gestion-utilisateurs-container {
+    padding: 20px;
+}
+
+/* ✅ Add Département Button */
+.add-user-btn {
+    background-color: #1b9c98;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+
+.societe-column {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.add-user-btn:hover {
+    background-color: #64bebc !important;
+    color: black !important;
+    transition: background-color 0.3s ease;
+}
+
+/* ✅ Ensure Textarea Matches Input Styles */
+textarea {
+    height: 110px;
+}
+
+/* ✅ Overlay Background (Ensures the Form Appears on Top) */
+.full-page-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+/* ✅ Form Title (Matches Other Components) */
+.form-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #1b9c98;
+}
+
+/* ✅ Input Fields */
+.custom-input {
+    padding: 8px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+    transition: border 0.2s;
+    background-color: #d0e8d2;
+}
+
+select {
+    width: 100%;
+}
+
+/* ✅ Labels */
+.custom-label {
+    font-weight: bold;
+    color: black;
+    font-size: 14px;
+    padding-bottom: 10px;
+}
+
+/* ✅ Submit Button Section */
+.submit-section {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+/* ✅ Table Styling (Consistent with Société Component) */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+th,
+td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+}
+
+th {
+    font-weight: bold;
+    background: #fff;
+}
+
+mat-form-field {
+    width: 250px;
+}
+
+/* ✅ Align Actions on the Right */
+.description-column {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+/* ✅ Buttons in Description Column */
+.actions-container {
+    display: flex;
+    gap: 10px;
+}
+
+/* ✅ Align Headers */
+h2 {
+    text-align: left;
+}
+
+/* ✅ Style the Form Container (Centered & Proper Width) */
+.user-form {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    width: 450px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    width: 1000px;
+    height: 500px;
+}
+
+/* ✅ Proper Spacing for Form Fields */
+.form-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    gap: 15px;
+}
+
+/* ✅ Form Grid Layout */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    gap: 20px;
+}
+
+/* ✅ Centering Labels & Inputs */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-left: 300px;
+    width: 35%;
+    padding-bottom: 15px;
+}
+
+/* ✅ Select Dropdown Styling */
+select.custom-input {
+    height: 40px;
+    padding: 8px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+    transition: border 0.2s;
+}
+
+/* ✅ Submit Button */
+.submit-section {
+    width: 37%;
+    margin-right: 40px;
+}
+
+.submit-button {
+    background-color: #1b9c98 !important;
+    color: white !important;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 95%;
+}
+
+.submit-button:hover {
+    background-color: #64bebc !important;
+    color: black !important;
+    transition: background-color 0.3s ease;
+}

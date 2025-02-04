@@ -21,7 +21,7 @@
             <mat-label>Rechercher ...</mat-label>
             <input matInput (keyup)="applyFilter($event)">
         </mat-form-field>
-        <div *ngIf="showUserForm" class="full-page-overlay" (click)="closeUserForm($event)">
+        <div *ngIf="showUserForm" class="full-page-overlay" (click)="closeUserForm()">
             <div class="user-form" (click)="$event.stopPropagation()">
                 <form [formGroup]="userForm" (ngSubmit)="onSubmit()">
                     <div class="profile-section">
@@ -126,7 +126,7 @@
         </div>
     </div>
     <!-- Edit User Modal (Appears on Edit Button Click) -->
-    <div *ngIf="showEditForm" class="full-page-overlay" (click)="closeEditForm($event)">
+    <div *ngIf="showEditForm" class="full-page-overlay" (click)="closeEditForm()">
         <div class="user-form" (click)="$event.stopPropagation()">
             <h2 class="form-title">Modifier Utilisateur</h2>
 

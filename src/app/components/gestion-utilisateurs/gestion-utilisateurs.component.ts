@@ -16,7 +16,7 @@ import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSortModule } from '@angular/material/sort';
-
+import { UserService } from '../../services/utilisateur.service';
 
 @Component({
   selector: 'app-gestion-utilisateurs',
@@ -47,22 +47,20 @@ export class GestionUtilisateursComponent implements OnInit {
     'name', 'email', 'password', 'societe', 'unite',
     'poste', 'departement', 'menu_cube', 'date_creation', 'status', 'actions'
   ];
-  selectedUser: any = null;
-  showEditForm: boolean = false;
   dataSource = new MatTableDataSource<any>([]);
-  selectedUsers: Set<number> = new Set();
-  statusFilter: string = '';
-  allSelected = false;
+  selectedUser: any = null;
+  showEditForm = false;
   showUserForm = false;
   userForm!: FormGroup;
   imagePreview: string | null = null;
   selectedFile: File | null = null;
-
-
+  selectedUsers: Set<number> = new Set();
+  allSelected = false;
+  statusFilter: string = '';
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  constructor(private http: HttpClient, private fb: FormBuilder) { } // ✅ HttpClient will now work because it's provided globally
+  constructor(private userService: UserService, private fb: FormBuilder) { } // ✅ Use UserService instead of HttpClient
 
   ngOnInit(): void {
     this.userForm = this.fb.group({
@@ -77,14 +75,24 @@ export class GestionUtilisateursComponent implements OnInit {
       menuCube: [''], // ✅ Not required
       active: [false]
     });
+
     this.loadUsers();
   }
+
+  // ✅ Load all users
+  loadUsers() {
+    this.userService.getUsers().subscribe(data => {
+      this.dataSource = new MatTableDataSource(data);
+      this.dataSource.paginator = this.paginator;
+      this.dataSource.sort = this.sort;
+    });
+  }
+
+  // ✅ Handle File Selection
   onFileSelected(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (file) {
       this.selectedFile = file;
-
-      // Generate an image preview
       const reader = new FileReader();
       reader.onload = () => {
         this.imagePreview = reader.result as string;
@@ -93,78 +101,69 @@ export class GestionUtilisateursComponent implements OnInit {
     }
   }
 
+  // ✅ Toggle User Form
+  toggleUserForm() {
+    this.showUserForm = !this.showUserForm;
+  }
+
+  // ✅ Close User Form
+  closeUserForm() {
+    this.showUserForm = false;
+  }
+
+  // ✅ Add User
   onSubmit() {
     if (this.userForm.valid) {
-      const formData = new FormData();
-      formData.append('name', this.userForm.value.name);
-      formData.append('email', this.userForm.value.email);
-      formData.append('password', this.userForm.value.password);
-      formData.append('societe', this.userForm.value.societe);
-      formData.append('poste', this.userForm.value.poste);
-      formData.append('departement', this.userForm.value.departement);
-      formData.append('unite', this.userForm.value.unite);
-      formData.append('menuCube', this.userForm.value.menuCube);
-      formData.append('active', this.userForm.value.active);
-
-      if (this.selectedFile) {
-        formData.append('profilePicture', this.selectedFile);
-      }
-
-      this.http.post('http://localhost:3000/api/users', formData).subscribe(() => {
+      const newUser = { ...this.userForm.value, profilePicture: this.selectedFile };
+      this.userService.addUser(newUser).subscribe(() => {
         this.loadUsers();
         this.toggleUserForm();
       });
     }
   }
 
-  loadUsers() {
-    this.http.get<any[]>('http://localhost:3000/api/users').subscribe(data => {
-      // ✅ Ensure the image URL is correct
-      this.dataSource = new MatTableDataSource(
-        data.map(user => ({
-          ...user,
-          profilePicture: user.profilePicture
-            ? `http://localhost:3000${user.profilePicture}`
-            : 'assets/IMG_2062.jpg'
-        }))
-      );
-
-      this.dataSource.paginator = this.paginator;
-      this.dataSource.sort = this.sort;
-    });
-  }
-  toggleUserForm() {
-    this.showUserForm = !this.showUserForm; // ✅ Show/Hide form
+  // ✅ Edit User
+  editUser(user: any) {
+    this.selectedUser = { ...user };
+    this.showEditForm = true;
+    this.userForm.patchValue(this.selectedUser);
   }
 
-  closeUserForm(event: Event) {
-    if (this.showUserForm) {
-      this.showUserForm = false; // ✅ Close form when clicking outside
+  // ✅ Close Edit Form
+  closeEditForm() {
+    this.showEditForm = false;
+  }
+
+  // ✅ Update User
+  onUpdateUser() {
+    if (this.userForm.valid) {
+      const updatedUser = { ...this.selectedUser, ...this.userForm.value };
+      this.userService.updateUser(updatedUser.id, updatedUser).subscribe(() => {
+        this.loadUsers();
+        this.showEditForm = false;
+      });
     }
   }
 
-  applyFilter(event: Event) {
-    const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
-    this.dataSource.filter = filterValue;
+  // ✅ Delete User
+  deleteUser(userId: number) {
+    if (confirm('Are you sure you want to delete this user?')) {
+      this.userService.deleteUser(userId).subscribe(() => {
+        this.loadUsers();
+      });
+    }
   }
-  applyStatusFilter(filterValue: string) {
-    this.statusFilter = filterValue;
-    this.dataSource.filterPredicate = (data, filter) => {
-      return filter === '' || data.status === filter;
-    };
-    this.dataSource.filter = filterValue;
-  }
-
   toggleSelectAllUsers() {
     if (this.allSelected) {
-      this.selectedUsers.clear(); // Deselect all
+      this.selectedUsers.clear(); // ✅ Deselect all
     } else {
       this.selectedUsers.clear();
       this.dataSource.filteredData.forEach(user => this.selectedUsers.add(user.id));
     }
-    this.allSelected = !this.allSelected; // Toggle button state
+    this.allSelected = !this.allSelected;
   }
 
+  // ✅ Toggle Selection for a Single User
   toggleSelection(userId: number) {
     if (this.selectedUsers.has(userId)) {
       this.selectedUsers.delete(userId);
@@ -173,32 +172,18 @@ export class GestionUtilisateursComponent implements OnInit {
     }
   }
 
-  deleteUser(userId: number) {
-    if (confirm('Are you sure you want to delete this user?')) {
-      this.http.delete(`http://localhost:3000/api/users/${userId}`).subscribe(() => {
-        this.loadUsers();
-      });
-    }
+  // ✅ Filter by Status
+  applyStatusFilter(filterValue: string) {
+    this.statusFilter = filterValue;
+    this.dataSource.filterPredicate = (data, filter) => {
+      return filter === '' || data.status === filter;
+    };
+    this.dataSource.filter = filterValue;
   }
-  editUser(user: any) {
-    this.selectedUser = { ...user }; // ✅ Copy user data to edit
-    this.showEditForm = true; // ✅ Show the edit modal
-    this.userForm.patchValue(this.selectedUser); // ✅ Pre-fill form with user data
-  }
-  closeEditForm(event: Event) {
-    if (this.showEditForm) {
-      this.showEditForm = false; // ✅ Hide edit form
-    }
-  }
-  onUpdateUser() {
-    if (this.userForm.valid) {
-      const updatedUser = { ...this.selectedUser, ...this.userForm.value };
 
-      this.http.put(`http://localhost:3000/api/users/${updatedUser.id}`, updatedUser)
-        .subscribe(() => {
-          this.loadUsers(); // ✅ Refresh user list
-          this.showEditForm = false; // ✅ Close edit form
-        });
-    }
+  // ✅ Apply Search Filter
+  applyFilter(event: Event) {
+    const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
+    this.dataSource.filter = filterValue;
   }
 }

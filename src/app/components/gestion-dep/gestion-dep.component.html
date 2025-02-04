@@ -1,1 +1,118 @@
-<p>gestion-dep works!</p>
+<div class="gestion-utilisateurs-container">
+    <!-- Actions (Add Département Button) -->
+    <div class="actions">
+        <button class="add-user-btn" (click)="openAddDepartementForm()">+ AJOUTER DÉPARTEMENT</button>
+    </div>
+
+    <!-- Add Département Modal -->
+    <div *ngIf="showAddDepartementForm" class="full-page-overlay" (click)="closeAddDepartementForm()">
+        <div class="user-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Ajouter Département</h2>
+            <form #addDepartementForm="ngForm" (ngSubmit)="onAddDepartement()" novalidate>
+                <div class="form-container">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="custom-label">NOM DE DÉPARTEMENT: *</label>
+                            <input type="text" [(ngModel)]="newDepartement.nom" name="nom" required
+                                class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">DESCRIPTION:</label>
+                            <textarea [(ngModel)]="newDepartement.description" name="description"
+                                class="custom-input"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">SOCIÉTÉ ASSOCIÉE: *</label>
+                            <select [(ngModel)]="newDepartement.societe_id" name="societe_id" required
+                                class="custom-input">
+                                <option *ngFor="let societe of societes" [value]="societe.id">{{ societe.nom }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button mat-raised-button class="submit-button" type="submit"
+                            [disabled]="addDepartementForm.invalid">
+                            AJOUTER
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Département Modal -->
+    <div *ngIf="showEditDepartementForm" class="full-page-overlay" (click)="closeEditDepartementForm()">
+        <div class="user-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Modifier Département</h2>
+            <form #editDepartementForm="ngForm" (ngSubmit)="onEditDepartement()" novalidate>
+                <div class="form-container">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="custom-label">NOM DE DÉPARTEMENT: *</label>
+                            <input type="text" [(ngModel)]="selectedDepartement.nom" name="nom" required
+                                class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">DESCRIPTION:</label>
+                            <textarea [(ngModel)]="selectedDepartement.description" name="description"
+                                class="custom-input"></textarea>
+                        </div>
+                        <!-- Edit Département Modal -->
+                        <div class="form-group">
+                            <label class="custom-label">SOCIÉTÉ ASSOCIÉE: *</label>
+                            <select [(ngModel)]="selectedDepartement.societe_id" name="societe_id" required
+                                class="custom-input">
+                                <option *ngFor="let societe of societes" [value]="societe.id"
+                                    [selected]="societe.id === selectedDepartement.societe_id">
+                                    {{ societe.nom }}
+                                </option>
+                            </select>
+
+                        </div>
+                    </div>
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button mat-raised-button class="submit-button" type="submit"
+                            [disabled]="editDepartementForm.invalid">
+                            MODIFIER
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table for Départements -->
+    <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
+        <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom</th>
+            <td mat-cell *matCellDef="let departement"> {{ departement.nom }}</td>
+        </ng-container>
+        <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+            <td mat-cell *matCellDef="let departement">{{ departement.description }}</td>
+        </ng-container>
+        <ng-container matColumnDef="societe">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Société</th>
+            <td mat-cell *matCellDef="let departement" class="societe-column">
+                <span>{{ departement.societe }}</span>
+                <span class="actions-container">
+                    <button mat-icon-button color="primary" (click)="openEditDepartementForm(departement)">
+                        <mat-icon>edit</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="deleteDepartement(departement.id)">
+                        <mat-icon>delete</mat-icon>
+                    </button>
+                </span>
+            </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+
+    <!-- Paginator -->
+    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+</div>

@@ -17,6 +17,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSortModule } from '@angular/material/sort';
+import { SocieteService } from '../../services/societe.service';
+
 @Component({
   selector: 'app-gestion-societes',
   imports: [FormsModule,
@@ -46,33 +48,30 @@ import { MatSortModule } from '@angular/material/sort';
 })
 export class GestionSocietesComponent implements OnInit {
   displayedColumns: string[] = ['name', 'description'];
-  societes: any[] = [];
-  showModal = false;
-  isEditMode = false;
-  selectedSociete: any = { nom: '', description: '' };
-  societeName = '';
   dataSource = new MatTableDataSource<any>([]);
-  showSocieteForm = false;
   showAddSocieteForm = false;
   showEditSocieteForm = false;
+  isEditMode = false;
+
   newSociete = { nom: '', description: '' };
+  selectedSociete: any = { id: null, nom: '', description: '' };
+
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  constructor(private http: HttpClient) { }
+  constructor(private societeService: SocieteService, private http: HttpClient) { } // ✅ Inject Service
 
   ngOnInit(): void {
     this.loadSocietes();
   }
 
   loadSocietes() {
-    this.http.get<any[]>('http://localhost:3000/api/societes')
-      .subscribe(data => {
-        console.log('Received Sociétés:', data); // ✅ Debugging log
-        this.dataSource = new MatTableDataSource(data);
-      }, error => {
-        console.error('API Error:', error);
-      });
+    this.societeService.getSocietes().subscribe(data => {
+      console.log('Loaded Sociétés:', data);
+      this.dataSource = new MatTableDataSource(data);
+      this.dataSource.paginator = this.paginator;
+      this.dataSource.sort = this.sort;
+    });
   }
 
   openAddSocieteForm() {
@@ -80,40 +79,36 @@ export class GestionSocietesComponent implements OnInit {
     this.newSociete = { nom: '', description: '' };
   }
 
-  closeAddSocieteForm(event: Event) {
+  closeAddSocieteForm() {
     this.showAddSocieteForm = false;
   }
 
-  openModal(editMode: boolean, societe?: any) {
-    this.isEditMode = editMode;
-    this.showModal = true;
-
-    if (editMode && societe) {
-      this.selectedSociete = { ...societe }; // ✅ Copy the object to avoid direct mutations
-    } else {
-      this.selectedSociete = { nom: '', description: '' };
+  openEditSocieteForm(societe: any) {
+    if (!societe || !societe.id) {
+      console.error('Error: Société ID is missing!', societe);
+      return;
     }
-  }
-  toggleSocieteForm() {
-    this.isEditMode = false;
-    this.selectedSociete = { nom: '', description: '' };
-    this.showSocieteForm = true;
+
+    this.selectedSociete = { ...societe };
+    console.log('Editing Société:', this.selectedSociete); // ✅ Log to confirm the ID exists
+    this.showEditSocieteForm = true;
   }
 
-  closeSocieteForm(event: Event) {
-    this.showSocieteForm = false;
+
+  closeEditSocieteForm() {
+    this.showEditSocieteForm = false;
   }
+
   onAddSociete() {
     if (!this.newSociete.nom.trim()) {
       alert('Le nom de la société est requis.');
       return;
     }
 
-    this.http.post('http://localhost:3000/api/societes', this.newSociete)
-      .subscribe(() => {
-        this.loadSocietes();
-        this.showAddSocieteForm = false;
-      });
+    this.societeService.addSociete(this.newSociete).subscribe(() => {
+      this.loadSocietes();
+      this.showAddSocieteForm = false;
+    });
   }
 
   onEditSociete() {
@@ -122,73 +117,24 @@ export class GestionSocietesComponent implements OnInit {
       return;
     }
 
-    this.http.put(`http://localhost:3000/api/societes/${this.selectedSociete.id}`, {
-      nom: this.selectedSociete.nom,
-      description: this.selectedSociete.description
-    }).subscribe(
-      () => {
-        this.loadSocietes();
-        this.showEditSocieteForm = false;
-      },
-      (error) => {
-        console.error('Edit Error:', error);
-      }
-    );
-  }
+    console.log('Updating Société:', this.selectedSociete); // ✅ Debugging Log
 
-
-  openEditSocieteForm(societe: any) {
-    this.selectedSociete = { ...societe };
-    this.showEditSocieteForm = true;
-  }
-
-  closeEditSocieteForm(event: Event) {
-    this.showEditSocieteForm = false;
-  }
-  onSubmit() {
-    if (this.isEditMode) {
-      this.http.put(`http://localhost:3000/api/societes/${this.selectedSociete.id}`, this.selectedSociete)
-        .subscribe(() => {
+    this.societeService.updateSociete(this.selectedSociete.id, this.selectedSociete)
+      .subscribe(
+        response => {
+          console.log('Société Updated Successfully:', response); // ✅ Success Log
           this.loadSocietes();
-          this.showSocieteForm = false;
-        });
-    } else {
-      this.http.post('http://localhost:3000/api/societes', this.selectedSociete)
-        .subscribe(() => {
-          this.loadSocietes();
-          this.showSocieteForm = false;
-        });
-    }
+          this.showEditSocieteForm = false;
+        },
+        error => {
+          console.error('Edit Error:', error); // ✅ Log error response
+        }
+      );
   }
 
-  closeModal() {
-    this.showModal = false;
-  }
-
-  saveSociete() {
-    if (this.selectedSociete.nom.trim() === '') {
-      alert('Le nom de la société est requis');
-      return;
-    }
-
-    if (this.isEditMode) {
-      this.http.put(`http://localhost:3000/api/societes/${this.selectedSociete.id}`, this.selectedSociete)
-        .subscribe(() => {
-          this.loadSocietes();
-          this.closeModal();
-        });
-    } else {
-      this.http.post('http://localhost:3000/api/societes', this.selectedSociete)
-        .subscribe(() => {
-          this.loadSocietes();
-          this.closeModal();
-        });
-    }
-  }
   deleteSociete(id: number) {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette société ?')) {
-      this.http.delete(`http://localhost:3000/api/societes/${id}`)
-        .subscribe(() => this.loadSocietes());
+      this.societeService.deleteSociete(id).subscribe(() => this.loadSocietes());
     }
   }
 }

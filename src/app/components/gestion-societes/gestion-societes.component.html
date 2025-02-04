@@ -5,7 +5,7 @@
     </div>
 
     <!-- Add Société Modal -->
-    <div *ngIf="showAddSocieteForm" class="full-page-overlay" (click)="closeAddSocieteForm($event)">
+    <div *ngIf="showAddSocieteForm" class="full-page-overlay" (click)="closeAddSocieteForm()">
         <div class="user-form" (click)="$event.stopPropagation()">
             <h2 class="form-title">Gestion Des Sociétés: </h2>
             <form #addSocieteForm="ngForm" (ngSubmit)="onAddSociete()" novalidate>
@@ -35,7 +35,7 @@
     </div>
 
     <!-- Edit Société Modal -->
-    <div *ngIf="showEditSocieteForm" class="full-page-overlay" (click)="closeEditSocieteForm($event)">
+    <div *ngIf="showEditSocieteForm" class="full-page-overlay" (click)="closeEditSocieteForm()">
         <div class="user-form" (click)="$event.stopPropagation()">
             <h2 class="form-title">Modifier Société</h2>
             <form #editSocieteForm="ngForm" (ngSubmit)="onEditSociete()" novalidate>

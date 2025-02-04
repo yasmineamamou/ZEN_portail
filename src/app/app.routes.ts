@@ -4,6 +4,7 @@ import { ParametreComponent } from './components/parametre/parametre.component';
 import { GestionUtilisateursComponent } from './components/gestion-utilisateurs/gestion-utilisateurs.component';
 import { GestionSocietesComponent } from './components/gestion-societes/gestion-societes.component';
 import { GestionDepComponent } from './components/gestion-dep/gestion-dep.component';
+import { GestionUnitesComponent } from './components/gestion-unites/gestion-unites.component';
 
 export const routes: Routes = [
     { path: '', component: DashboardComponent },
@@ -11,4 +12,5 @@ export const routes: Routes = [
     { path: 'gestion-utilisateurs', component: GestionUtilisateursComponent },
     { path: 'gestion-societes', component: GestionSocietesComponent },
     { path: 'gestion-departements', component: GestionDepComponent },
+    { path: 'gestion-unites', component: GestionUnitesComponent },
 ];

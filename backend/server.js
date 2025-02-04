@@ -33,27 +33,7 @@ sql.connect(dbConfig)
     .then(() => console.log('Connected to SQL Server'))
     .catch(err => console.error('Database connection failed', err));
 
-// Get all users
-// Get all users
-app.get('/api/users', async (req, res) => {
-    try {
-        const result = await sql.query('SELECT * FROM users');
 
-        // ✅ Fix image URLs before sending response
-        const users = result.recordset.map(user => ({
-            ...user,
-            profilePicture: user.profilePicture
-                ? `http://localhost:3000${user.profilePicture}`  // ✅ Ensure full image URL
-                : null  // No image uploaded
-        }));
-
-        console.log('Fetched users:', users); // ✅ Debugging log
-        res.json(users);
-    } catch (err) {
-        console.error('Database Error:', err); // ✅ Log error to console
-        res.status(500).json({ error: 'Database error', details: err.message });
-    }
-});
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -63,7 +43,10 @@ const storage = multer.diskStorage({
         cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
     }
 });
-
+// Start Server
+app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+});
 const upload = multer({ storage });
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Add a user
@@ -103,10 +86,22 @@ app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
     }
 });
 
+app.get('/api/users', async (req, res) => {
+    try {
+        const result = await sql.query('SELECT * FROM users');
 
-// Start Server
-app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
+        // ✅ Fix image URLs before sending response
+        const users = result.recordset.map(user => ({
+            ...user,
+            profilePicture: user.profilePicture
+                ? `http://localhost:3000${user.profilePicture}`  // ✅ Ensure full image URL
+                : null  // No image uploaded
+        }));
+        res.json(users);
+    } catch (err) {
+        console.error('Database Error:', err); // ✅ Log error to console
+        res.status(500).json({ error: 'Database error', details: err.message });
+    }
 });
 // Delete User API
 app.delete('/api/users/:id', async (req, res) => {
@@ -185,62 +180,113 @@ app.delete('/api/societes/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-app.get('/api/departements', async (req, res) => {
-    try {
-        const result = await sql.query('SELECT * FROM Departement');
-        res.json(result.recordset);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-app.post('/api/departements', async (req, res) => {
-    try {
-        const { nom, societe_id } = req.body;
-
-        const query = `
-            INSERT INTO Departement (nom, societe_id, description) 
-            VALUES (@nom, @societe_id, @description)
-        `;
-        const request = new sql.Request();
-        request.input('nom', sql.NVarChar, nom);
-        request.input('societe_id', sql.Int, societe_id);
-        equest.input('description', sql.NVarChar, description);
-
-        await request.query(query);
-        res.status(201).json({ message: 'Département added successfully' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 app.put('/api/societes/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { nom, description } = req.body;
 
-        if (!nom || !description) {
-            return res.status(400).json({ error: 'Nom et description sont requis' });
+        if (!id || !nom) {
+            return res.status(400).json({ error: 'ID and nom are required.' });
+        }
+
+        const request = new sql.Request();
+        request.input('id', sql.Int, id);
+        request.input('nom', sql.NVarChar, nom);
+        request.input('description', sql.NVarChar, description || null);
+
+        const query = `UPDATE Societes SET nom = @nom, description = @description WHERE id = @id`;
+        await request.query(query);
+
+        res.json({ message: 'Société updated successfully.' });
+    } catch (err) {
+        console.error('Update Error:', err);
+        res.status(500).json({ error: 'Failed to update Société' });
+    }
+});
+
+app.get('/api/departements', async (req, res) => {
+    try {
+        const result = await sql.query(`
+            SELECT Departement.id, Departement.nom, Departement.description, 
+                   Societe.nom AS societe  
+            FROM Departement 
+            JOIN Societe ON Departement.societe_id = Societe.id
+        `);
+
+        console.log('Departements Data:', result.recordset); // ✅ Debugging Log
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Database Error:', err); // ✅ Log error to console
+        res.status(500).json({ error: 'Database error', details: err.message });
+    }
+});
+app.post('/api/departements', async (req, res) => {
+    try {
+        const { nom, description, societe_id } = req.body;
+
+        // ✅ Debugging Log: Check received data
+        console.log('Received Data:', req.body);
+
+        // Validate Required Fields
+        if (!nom || !societe_id) {
+            console.error('Validation Error: Nom and Société are required');
+            return res.status(400).json({ error: 'Nom and Société are required' });
         }
 
         const query = `
-            UPDATE Societe 
-            SET nom = @nom, description = @description 
+            INSERT INTO Departement (nom, description, societe_id) 
+            VALUES (@nom, @description, @societe_id)
+        `;
+
+        const request = new sql.Request();
+        request.input('nom', sql.NVarChar, nom);
+        request.input('description', sql.NVarChar, description || null);
+        request.input('societe_id', sql.Int, societe_id);
+
+        await request.query(query);
+
+        console.log('Département added successfully!');
+        res.status(201).json({ message: 'Département ajouté avec succès' });
+    } catch (err) {
+        console.error('Database Error:', err); // ✅ Debugging Log
+        res.status(500).json({ error: 'Database error', details: err.message });
+    }
+});
+
+app.put('/api/departements/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nom, description, societe_id } = req.body;
+
+        if (!nom || !societe_id) {
+            return res.status(400).json({ error: 'Nom et Société sont requis' });
+        }
+
+        const query = `
+            UPDATE Departement 
+            SET nom = @nom, description = @description, societe_id = @societe_id 
             WHERE id = @id
         `;
 
         const request = new sql.Request();
         request.input('id', sql.Int, id);
         request.input('nom', sql.NVarChar, nom);
-        request.input('description', sql.NVarChar, description);
+        request.input('description', sql.NVarChar, description || null);
+        request.input('societe_id', sql.Int, societe_id);
 
         await request.query(query);
-
-        res.json({ message: 'Société mise à jour avec succès' });
+        res.json({ message: 'Département mis à jour avec succès' });
     } catch (err) {
-        console.error('Database Update Error:', err);
-        res.status(500).json({ error: 'Erreur interne du serveur', details: err.message });
+        res.status(500).json({ error: 'Database error', details: err.message });
     }
 });
 
 
-
-
+app.delete('/api/departements/:id', async (req, res) => {
+    try {
+        await sql.query`DELETE FROM Departement WHERE id = ${req.params.id}`;
+        res.json({ message: 'Département supprimé avec succès' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
