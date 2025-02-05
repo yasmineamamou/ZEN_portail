@@ -1,20 +1,19 @@
-.gestion-unites-container {
+.gestion-cubes-container {
     padding: 20px;
 }
 
-.add-unite-btn,
+.add-cube-btn,
 .submit-button {
     background-color: #1B9C98 !important;
     color: white;
     padding: 10px 15px;
     border: none;
     border-radius: 5px;
-    font-weight: bold;
     margin-bottom: 20px;
     cursor: pointer;
 }
 
-.add-unite-btn:hover {
+.add-cube-btn:hover {
     background-color: #64bebc !important;
     color: black !important;
     transition: background-color 0.3s ease;
@@ -122,13 +121,12 @@ mat-form-field {
     gap: 10px;
 }
 
-
 h2 {
     text-align: left;
 }
 
 /* ✅ Style the form container (centering and width control) */
-.unite-form {
+.cube-form {
     background: white;
     padding: 30px;
     border-radius: 10px;
@@ -173,8 +171,6 @@ h2 {
     width: 37%;
     margin-right: 30px;
 }
-
-
 
 .submit-button:hover {
     background-color: #64bebc !important;

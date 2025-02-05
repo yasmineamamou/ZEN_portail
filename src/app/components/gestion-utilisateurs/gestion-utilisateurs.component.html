@@ -76,37 +76,61 @@
                                 <input matInput type="password" formControlName="password" required
                                     class="custom-input">
                             </div>
+                            <!-- Société Selection -->
                             <div class="form-group">
                                 <label class="custom-label">SOCIÉTÉ*</label>
-                                <select formControlName="societe" required class="custom-select">
-                                    <option value="zen">ZEN Group</option>
+                                <select [(ngModel)]="selectedUser.societe_id" name="societe_id" required
+                                    class="custom-input" (change)="loadDepartements(selectedUser.societe_id)">
+                                    <option *ngFor="let societe of societes" [value]="societe.id">
+                                        {{ societe.nom }}
+                                    </option>
                                 </select>
                             </div>
 
-                            <!-- Row 3 -->
-                            <div class="form-group">
-                                <label class="custom-label">POSTE*</label>
-                                <input matInput formControlName="poste" required class="custom-input">
-                            </div>
+                            <!-- Département Selection (Filtered by Société) -->
                             <div class="form-group">
                                 <label class="custom-label">DÉPARTEMENT*</label>
-                                <select formControlName="departement" required class="custom-select">
-                                    <option value="rh">RH</option>
-                                    <option value="commercial">Commercial</option>
+                                <select [(ngModel)]="selectedUser.departement_id" name="departement_id" required
+                                    class="custom-input">
+                                    <option *ngFor="let departement of departements" [value]="departement.id">
+                                        {{ departement.nom }}
+                                    </option>
                                 </select>
                             </div>
 
-                            <!-- Row 4 -->
+                            <!-- Poste Selection -->
                             <div class="form-group">
-                                <label class="custom-label">UNITÉ*</label>
-                                <input matInput formControlName="unite" required class="custom-input">
-                            </div>
-                            <div class="form-group">
-                                <label class="custom-label">MENU DE CUBE</label>
-                                <select formControlName="menuCube" class="custom-select">
-                                    <option value="option1">Option 1</option>
+                                <label class="custom-label">POSTE*</label>
+                                <select [(ngModel)]="selectedUser.poste_id" name="poste_id" required
+                                    class="custom-input">
+                                    <option *ngFor="let poste of postes" [value]="poste.id">
+                                        {{ poste.nom }}
+                                    </option>
                                 </select>
                             </div>
+
+                            <!-- Unités Multi-Selection -->
+                            <div class="form-group">
+                                <label class="custom-label">UNITÉS*</label>
+                                <select [(ngModel)]="selectedUser.unite_ids" name="unite_ids" multiple
+                                    class="custom-input">
+                                    <option *ngFor="let unite of unites" [value]="unite.id">
+                                        {{ unite.nom }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Menu Cube Multi-Selection -->
+                            <div class="form-group">
+                                <label class="custom-label">MENU CUBE</label>
+                                <select [(ngModel)]="selectedUser.menu_cube_ids" name="menu_cube_ids" multiple
+                                    class="custom-input">
+                                    <option *ngFor="let cube of menuCubes" [value]="cube.id">
+                                        {{ cube.nom }}
+                                    </option>
+                                </select>
+                            </div>
+
                         </div>
 
                         <!-- Activation Toggle -->

@@ -57,6 +57,23 @@ export class GestionUtilisateursComponent implements OnInit {
   selectedUsers: Set<number> = new Set();
   allSelected = false;
   statusFilter: string = '';
+  societes: any[] = [];
+  departements: any[] = [];
+  postes: any[] = [];
+  unites: any[] = [];
+  menuCubes: any[] = [];
+  newUser = {
+    name: '',
+    email: '',
+    password: '',
+    societe_id: null,
+    departement_id: null,
+    poste_id: null,
+    unite_ids: [],
+    menu_cube_ids: [],
+    active: false
+  };
+
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
@@ -68,26 +85,36 @@ export class GestionUtilisateursComponent implements OnInit {
       name: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       password: ['', Validators.required],
-      societe: ['', Validators.required],
-      poste: ['', Validators.required],
-      departement: ['', Validators.required],
-      unite: ['', Validators.required],
-      menuCube: [''], // ✅ Not required
+      societe_id: ['', Validators.required],
+      departement_id: ['', Validators.required],
+      poste_id: ['', Validators.required],
+      unite_ids: [[]], // For multiple unite
+      menu_cube_ids: [[]], // For multiple menu cubes
       active: [false]
     });
 
     this.loadUsers();
+    this.loadSocietes();
+    this.loadPostes();
+    this.loadCubes();
+    this.loadUnites();
   }
+
 
   // ✅ Load all users
   loadUsers() {
     this.userService.getUsers().subscribe(data => {
+      console.log('Loaded User:', data);
       this.dataSource = new MatTableDataSource(data);
       this.dataSource.paginator = this.paginator;
       this.dataSource.sort = this.sort;
     });
   }
 
+
+  onSocieteChange(societeId: number) {
+    this.userService.getDepartements(societeId).subscribe(data => this.departements = data);
+  }
   // ✅ Handle File Selection
   onFileSelected(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
@@ -186,4 +213,90 @@ export class GestionUtilisateursComponent implements OnInit {
     const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
     this.dataSource.filter = filterValue;
   }
+  onAddUser() {
+    console.log('Adding User:', this.newUser); // ✅ Debugging log
+
+    if (!this.newUser.name?.trim() || !this.newUser.email?.trim() || !this.newUser.password?.trim() || !this.newUser.societe_id) {
+      alert('Nom, email, mot de passe et société sont requis.');
+      return;
+    }
+
+    this.userService.addUser(this.newUser).subscribe(() => {
+      this.loadUsers();
+      this.showUserForm = false;
+    });
+  }
+  openEditUserForm(user: any) {
+    this.selectedUser = { ...user };
+    console.log('Editing User:', this.selectedUser); // ✅ Debugging log
+
+    // Ensure societe_id is assigned correctly
+    const matchingSociete = this.societes.find(s => s.nom === user.societe);
+    this.selectedUser.societe_id = matchingSociete ? matchingSociete.id : null;
+
+    console.log('Société ID:', this.selectedUser.societe_id); // ✅ Debugging log
+
+    this.loadDepartements(this.selectedUser.societe_id); // Load corresponding departments
+
+    this.showEditForm = true;
+  }
+
+
+
+  loadSocietes() {
+    this.userService.getSocietes().subscribe(data => {
+      console.log("🔹 Societes Loaded:", data); // ✅ Debugging log
+      this.societes = data.map(societe => ({
+        ...societe,
+        id: Number(societe.id)
+      }));
+    });
+  }
+
+  loadDepartements(societeId: number) {
+    if (!societeId) {
+      this.departements = [];
+      return;
+    }
+
+    this.userService.getDepartements(societeId).subscribe(data => {
+      console.log("🔹 Departements Loaded:", data); // ✅ Debugging log
+      this.departements = data.map(departement => ({
+        ...departement,
+        id: Number(departement.id)
+      }));
+    });
+  }
+
+  loadPostes() {
+    this.userService.getPostes().subscribe(data => {
+      console.log("🔹 Postes Loaded:", data); // ✅ Debugging log
+      this.postes = data.map(poste => ({
+        ...poste,
+        id: Number(poste.id)
+      }));
+    });
+  }
+
+  loadUnites() {
+    this.userService.getUnites().subscribe(data => {
+      console.log("🔹 Unites Loaded:", data); // ✅ Debugging log
+      this.unites = data.map(unite => ({
+        ...unite,
+        id: Number(unite.id)
+      }));
+    });
+  }
+
+  loadCubes() {
+    this.userService.getCubes().subscribe(data => {
+      console.log("🔹 Menu Cubes Loaded:", data); // ✅ Debugging log
+      this.menuCubes = data.map(cube => ({
+        ...cube,
+        id: Number(cube.id)
+      }));
+    });
+  }
+
+
 }

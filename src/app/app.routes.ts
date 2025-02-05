@@ -5,6 +5,8 @@ import { GestionUtilisateursComponent } from './components/gestion-utilisateurs/
 import { GestionSocietesComponent } from './components/gestion-societes/gestion-societes.component';
 import { GestionDepComponent } from './components/gestion-dep/gestion-dep.component';
 import { GestionUnitesComponent } from './components/gestion-unites/gestion-unites.component';
+import { GestionPostesComponent } from './components/gestion-postes/gestion-postes.component';
+import { GestionCubesComponent } from './components/gestion-cubes/gestion-cubes.component';
 
 export const routes: Routes = [
     { path: '', component: DashboardComponent },
@@ -13,4 +15,6 @@ export const routes: Routes = [
     { path: 'gestion-societes', component: GestionSocietesComponent },
     { path: 'gestion-departements', component: GestionDepComponent },
     { path: 'gestion-unites', component: GestionUnitesComponent },
+    { path: 'gestion-postes', component: GestionPostesComponent },
+    { path: 'gestion-cubes', component: GestionCubesComponent },
 ];

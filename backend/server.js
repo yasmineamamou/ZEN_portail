@@ -56,7 +56,7 @@ app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
     console.log('Uploaded File:', req.file); // Debugging Log
 
     try {
-        const { name, email, password, societe, unite, poste, departement, menuCube, active } = req.body;
+        const { name, email, password, societe, unite, poste, departement, Cube, active } = req.body;
         const profilePicture = req.file ? `/uploads/${req.file.filename}` : null;
 
         if (!name || !email || !password) {
@@ -64,8 +64,8 @@ app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
         }
 
         const query = `
-        INSERT INTO Users (name, email, password, societe, unite, poste, departement, menu_cube, status, date_creation, profilePicture)
-        VALUES (@name, @email, @password, @societe, @unite, @poste, @departement, @menuCube, @active, GETDATE(), @profilePicture)
+        INSERT INTO Users (name, email, password, societe, unite, poste, departement, cube, status, date_creation, profilePicture)
+        VALUES (@name, @email, @password, @societe, @unite, @poste, @departement, @Cube, @active, GETDATE(), @profilePicture)
       `;
 
         const request = new sql.Request();
@@ -76,7 +76,7 @@ app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
         request.input('unite', sql.NVarChar, unite);
         request.input('poste', sql.NVarChar, poste);
         request.input('departement', sql.NVarChar, departement);
-        request.input('menuCube', sql.NVarChar, menuCube);
+        request.input('Cube', sql.NVarChar, Cube);
         request.input('active', sql.NVarChar, active ? 'Activé' : 'Désactivé');
         request.input('profilePicture', sql.NVarChar, profilePicture);
 
@@ -119,12 +119,12 @@ app.delete('/api/users/:id', async (req, res) => {
 app.put('/api/users/:id', async (req, res) => {
     try {
         const userId = req.params.id;
-        const { name, email, password, societe, unite, poste, departement, menuCube, active, profilePicture } = req.body;
+        const { name, email, password, societe, unite, poste, departement, Cube, active, profilePicture } = req.body;
 
         const query = `
             UPDATE Users 
             SET name = @name, email = @email, password = @password, societe = @societe, 
-                unite = @unite, poste = @poste, departement = @departement, menu_cube = @menuCube, 
+                unite = @unite, poste = @poste, departement = @departement, cube = @Cube, 
                 status = @active, profilePicture = @profilePicture
             WHERE id = @userId
         `;
@@ -138,7 +138,7 @@ app.put('/api/users/:id', async (req, res) => {
         request.input('unite', sql.NVarChar, unite);
         request.input('poste', sql.NVarChar, poste);
         request.input('departement', sql.NVarChar, departement);
-        request.input('menuCube', sql.NVarChar, menuCube);
+        request.input('Cube', sql.NVarChar, Cube);
         request.input('active', sql.NVarChar, active);
         request.input('profilePicture', sql.NVarChar, profilePicture);
 
@@ -349,6 +349,117 @@ app.delete('/unites/:id', async (req, res) => {
         await sql.connect(dbConfig);
         await sql.query(`DELETE FROM unites WHERE id = ${req.params.id}`);
         res.json({ message: 'Unite deleted successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+app.get('/postes', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query('SELECT * FROM postes');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Get poste by ID
+app.get('/postes/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query(`SELECT * FROM postes WHERE id = ${req.params.id}`);
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Add poste
+app.post('/postes', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`INSERT INTO postes (nom, description) VALUES ('${nom}', '${description}')`);
+        res.status(201).json({ message: 'Poste added successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Update poste
+app.put('/postes/:id', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`UPDATE postes SET nom = '${nom}', description = '${description}' WHERE id = ${req.params.id}`);
+        res.json({ message: 'Poste updated successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Delete poste
+app.delete('/postes/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        await sql.query(`DELETE FROM postes WHERE id = ${req.params.id}`);
+        res.json({ message: 'Poste deleted successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/cubes', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query('SELECT * FROM cubes');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Get poste by ID
+app.get('/cubes/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query(`SELECT * FROM cubes WHERE id = ${req.params.id}`);
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Add poste
+app.post('/cubes', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`INSERT INTO cubes (nom, description) VALUES ('${nom}', '${description}')`);
+        res.status(201).json({ message: 'cube added successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Update poste
+app.put('/cubes/:id', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`UPDATE cubes SET nom = '${nom}', description = '${description}' WHERE id = ${req.params.id}`);
+        res.json({ message: 'cube updated successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// Delete poste
+app.delete('/cubes/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        await sql.query(`DELETE FROM cubes WHERE id = ${req.params.id}`);
+        res.json({ message: 'cube deleted successfully' });
     } catch (err) {
         res.status(500).send(err.message);
     }

@@ -1,30 +1,30 @@
-<div class="gestion-unites-container">
-    <!-- Actions (Add Unité Button) -->
+<div class="gestion-postes-container">
+    <!-- Actions (Add Poste Button) -->
     <div class="actions">
-        <button class="add-unite-btn" (click)="openAddUniteForm()">+ AJOUTER SOCIÉTÉ</button>
+        <button class="add-poste-btn" (click)="openAddPosteForm()">+ AJOUTER POSTE</button>
     </div>
 
-    <!-- Add Unité Modal -->
-    <div *ngIf="showAddUniteForm" class="full-page-overlay" (click)="closeAddUniteForm()">
-        <div class="unite-form" (click)="$event.stopPropagation()">
-            <h2 class="form-title">Gestion Des Unités: </h2>
-            <form #addUniteForm="ngForm" (ngSubmit)="onAddUnite()" novalidate>
+    <!-- Add POSTE Modal -->
+    <div *ngIf="showAddPosteForm" class="full-page-overlay" (click)="closeAddPosteForm()">
+        <div class="poste-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Gestion Des Postes: </h2>
+            <form #addPosteForm="ngForm" (ngSubmit)="onAddPoste()" novalidate>
                 <div class="form-container">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label class="custom-label">NOM DE L'UNITE: *</label>
-                            <input type="text" [(ngModel)]="newUnite.nom" name="nom" required class="custom-input">
+                            <label class="custom-label">NOM DE POSTE: *</label>
+                            <input type="text" [(ngModel)]="newPoste.nom" name="nom" required class="custom-input">
                         </div>
                         <div class="form-group">
                             <label class="custom-label">DESCRIPTION:</label>
-                            <textarea [(ngModel)]="newUnite.description" name="description"
+                            <textarea [(ngModel)]="newPoste.description" name="description"
                                 class="custom-input"></textarea>
                         </div>
                     </div>
 
                     <!-- Submit Button -->
                     <div class="submit-section">
-                        <button mat-raised-button class="submit-button" type="submit" [disabled]="addUniteForm.invalid">
+                        <button mat-raised-button class="submit-button" type="submit" [disabled]="addPosteForm.invalid">
                             AJOUTER
                         </button>
                     </div>
@@ -32,20 +32,20 @@
             </form>
         </div>
     </div>
-    <!-- Edit Unité Modal -->
-    <div *ngIf="showEditUniteForm" class="full-page-overlay" (click)="closeEditUniteForm()">
-        <div class="unite-form" (click)="$event.stopPropagation()">
-            <h2 class="form-title">Modifier Unité:</h2>
-            <form #editUniteForm="ngForm" (ngSubmit)="onEditUnite()" novalidate>
+    <!-- Edit Poste Modal -->
+    <div *ngIf="showEditPosteForm" class="full-page-overlay" (click)="closeEditPosteForm()">
+        <div class="poste-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Modifier Poste:</h2>
+            <form #editPosteForm="ngForm" (ngSubmit)="onEditPoste()" novalidate>
                 <div class="form-container">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label class="custom-label">NOM DE UNITE: *</label>
-                            <input type="text" [(ngModel)]="selectedUnite.nom" name="nom" required class="custom-input">
+                            <label class="custom-label">NOM DE POSTE: *</label>
+                            <input type="text" [(ngModel)]="selectedPoste.nom" name="nom" required class="custom-input">
                         </div>
                         <div class="form-group">
                             <label class="custom-label">DESCRIPTION:</label>
-                            <textarea [(ngModel)]="selectedUnite.description" name="description"
+                            <textarea [(ngModel)]="selectedPoste.description" name="description"
                                 class="custom-input"></textarea>
                         </div>
                     </div>
@@ -53,7 +53,7 @@
                     <!-- Submit Button -->
                     <div class="submit-section">
                         <button mat-raised-button class="submit-button" type="submit"
-                            [disabled]="editUniteForm.invalid">
+                            [disabled]="editPosteForm.invalid">
                             MODIFIER
                         </button>
                     </div>
@@ -61,22 +61,22 @@
             </form>
         </div>
     </div>
-    <!-- Table for Unités -->
+    <!-- Table for Postes -->
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
         <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom</th>
-            <td mat-cell *matCellDef="let unite"> {{ unite.nom }}</td>
+            <td mat-cell *matCellDef="let poste"> {{ poste.nom }}</td>
         </ng-container>
 
         <ng-container matColumnDef="description">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
-            <td mat-cell *matCellDef="let unite" class="description-column">
-                <span>{{ unite.description }}</span>
+            <td mat-cell *matCellDef="let poste" class="description-column">
+                <span>{{ poste.description }}</span>
                 <span class="actions-container">
-                    <button mat-icon-button color="primary" (click)="openEditUniteForm(unite)">
+                    <button mat-icon-button color="primary" (click)="openEditPosteForm(poste)">
                         <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button color="warn" (click)="deleteUnite(unite.id)">
+                    <button mat-icon-button color="warn" (click)="deletePoste(poste.id)">
                         <mat-icon>delete</mat-icon>
                     </button>
                 </span>
