@@ -28,16 +28,19 @@
                         <!-- Left: Profile Selection -->
                         <div class="profile-selection-container">
                             <label class="form-label" style="font-weight: bold;">PROFIL* :</label>
-                            <mat-radio-group formControlName="profil" class="radio-group">
+                            <mat-radio-group [(ngModel)]="user.role" name="role" formControlName="role"
+                                class="radio-group">
                                 <mat-radio-button value="admin">ADMIN</mat-radio-button>
                                 <mat-radio-button value="client">CLIENT</mat-radio-button>
                                 <mat-radio-button value="super-admin">SUPER ADMIN</mat-radio-button>
                             </mat-radio-group>
-                            <div *ngIf="userForm.controls['profil'].invalid && userForm.controls['profil'].touched"
+
+                            <div *ngIf="userForm.controls['role'].invalid && userForm.controls['role'].touched"
                                 class="error-message">
                                 Sélectionnez un profil.
                             </div>
                         </div>
+
 
                         <!-- Right: Profile Picture -->
                         <div class="profile-picture-container" (click)="fileInput.click()">
@@ -58,29 +61,32 @@
                         </div>
 
                     </div>
+
                     <div class="form-container">
                         <div class="form-grid">
                             <!-- Row 1 -->
                             <div class="form-group">
                                 <label class="custom-label">NOM ET PRÉNOM*</label>
-                                <input matInput formControlName="name" required class="custom-input">
+                                <input matInput formControlName="name" required [(ngModel)]="user.name" name="name"
+                                    required class="custom-input">
                             </div>
                             <div class="form-group">
                                 <label class="custom-label">E-MAIL*</label>
-                                <input matInput type="email" formControlName="email" required class="custom-input">
+                                <input [(ngModel)]="user.email" matInput type="email" formControlName="email" required
+                                    class="custom-input">
                             </div>
 
                             <!-- Row 2 -->
                             <div class="form-group">
                                 <label class="custom-label">MOT DE PASSE*</label>
-                                <input matInput type="password" formControlName="password" required
-                                    class="custom-input">
+                                <input [(ngModel)]="user.password" name="password" matInput type="password"
+                                    formControlName="password" required class="custom-input">
                             </div>
                             <!-- Société Selection -->
                             <div class="form-group">
                                 <label class="custom-label">SOCIÉTÉ*</label>
-                                <select [(ngModel)]="selectedUser.societe_id" name="societe_id" required
-                                    class="custom-input" (change)="loadDepartements(selectedUser.societe_id)">
+                                <select formControlName="societe_id" class="custom-select"
+                                    (change)="onSocieteSelected()">
                                     <option *ngFor="let societe of societes" [value]="societe.id">
                                         {{ societe.nom }}
                                     </option>
@@ -90,8 +96,7 @@
                             <!-- Département Selection (Filtered by Société) -->
                             <div class="form-group">
                                 <label class="custom-label">DÉPARTEMENT*</label>
-                                <select [(ngModel)]="selectedUser.departement_id" name="departement_id" required
-                                    class="custom-input">
+                                <select formControlName="departement_id" class="custom-select">
                                     <option *ngFor="let departement of departements" [value]="departement.id">
                                         {{ departement.nom }}
                                     </option>
@@ -101,8 +106,7 @@
                             <!-- Poste Selection -->
                             <div class="form-group">
                                 <label class="custom-label">POSTE*</label>
-                                <select [(ngModel)]="selectedUser.poste_id" name="poste_id" required
-                                    class="custom-input">
+                                <select formControlName="poste_id" class="custom-select">
                                     <option *ngFor="let poste of postes" [value]="poste.id">
                                         {{ poste.nom }}
                                     </option>
@@ -110,40 +114,60 @@
                             </div>
 
                             <!-- Unités Multi-Selection -->
-                            <div class="form-group">
-                                <label class="custom-label">UNITÉS*</label>
-                                <select [(ngModel)]="selectedUser.unite_ids" name="unite_ids" multiple
-                                    class="custom-input">
-                                    <option *ngFor="let unite of unites" [value]="unite.id">
-                                        {{ unite.nom }}
-                                    </option>
-                                </select>
+
+
+                            <!-- Menu Cube Selection with Scrollable List -->
+                            <div class="form-container">
+                                <div class="form-grid">
+                                    <!-- Unités Multi-Selection -->
+                                    <div class="form-group">
+                                        <label class="custom-label">UNITÉ*</label>
+                                        <mat-form-field appearance="outline">
+                                            <mat-select formControlName="unite_ids" multiple
+                                                panelClass="custom-dropdown-panel" [(ngModel)]="user.unites"
+                                                name="unites">
+                                                <mat-form-field>
+                                                    <mat-label>Rechercher ...</mat-label>
+                                                    <input matInput (input)="updateFilteredUnites($event)">
+                                                </mat-form-field>
+                                                <mat-option (click)="toggleAllUnites()">Sélectionner Tous</mat-option>
+                                                <mat-option *ngFor="let unite of filteredUnites" [value]="unite.id">{{
+                                                    unite.nom }}</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+                                    </div>
+
+                                    <!-- Menu Cube Multi-Selection -->
+                                    <div class="form-group">
+                                        <label class="custom-label">MENU CUBE*</label>
+                                        <mat-form-field appearance="outline">
+                                            <mat-select formControlName="menu_cube_ids" multiple
+                                                panelClass="custom-dropdown-panel" [(ngModel)]="user.cubes"
+                                                name="cubes">
+                                                <mat-form-field>
+                                                    <mat-label>Rechercher ...</mat-label>
+                                                    <input matInput (input)="updateFilteredMenuCubes($event)">
+                                                </mat-form-field>
+                                                <mat-option (click)="toggleAllMenuCubes()">Sélectionner
+                                                    Tous</mat-option>
+                                                <mat-option *ngFor="let cube of filteredMenuCubes" [value]="cube.id">{{
+                                                    cube.nom }}</mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+                                    </div>
+                                </div>
                             </div>
-
-                            <!-- Menu Cube Multi-Selection -->
-                            <div class="form-group">
-                                <label class="custom-label">MENU CUBE</label>
-                                <select [(ngModel)]="selectedUser.menu_cube_ids" name="menu_cube_ids" multiple
-                                    class="custom-input">
-                                    <option *ngFor="let cube of menuCubes" [value]="cube.id">
-                                        {{ cube.nom }}
-                                    </option>
-                                </select>
-                            </div>
-
                         </div>
+                    </div>
+                    <!-- Activation Toggle -->
+                    <div class="activation-section">
+                        <label class="custom-label">ACTIVÉ* :</label>
+                        <mat-slide-toggle formControlName="active"></mat-slide-toggle>
+                    </div>
 
-                        <!-- Activation Toggle -->
-                        <div class="activation-section">
-                            <label class="custom-label">ACTIVÉ* :</label>
-                            <mat-slide-toggle formControlName="active"></mat-slide-toggle>
-                        </div>
-
-                        <!-- Submit Button -->
-                        <div class="submit-section">
-                            <button mat-raised-button class="submit-button" type="submit"
-                                [disabled]="userForm.invalid">ENREGISTRER</button>
-                        </div>
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button mat-raised-button class="submit-button" type="submit">ENREGISTRER</button>
                     </div>
                 </form>
             </div>
@@ -293,11 +317,12 @@
         <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
             <td mat-cell *matCellDef="let user">
-                <span [ngClass]="{ 'active': user.status === 'Activé', 'inactive': user.status === 'Désactivé' }">
-                    {{ user.status }}
+                <span [ngClass]="{ 'active': user.status, 'inactive': !user.status }">
+                    {{ user.status ? 'Activé' : 'Désactivé' }}
                 </span>
             </td>
         </ng-container>
+
         <!-- Actions Column -->
         <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>Actions</th>
@@ -314,5 +339,7 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
+
+
     <!-- Paginator -->
     <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>

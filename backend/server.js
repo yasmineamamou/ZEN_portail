@@ -50,40 +50,75 @@ app.listen(port, () => {
 const upload = multer({ storage });
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Add a user
+
+
 app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
-    console.log('Received Data:', req.body); // Debugging Log
-    console.log('Uploaded File:', req.file); // Debugging Log
+    const { name, email, password, societe_id, poste_id, departement_id, status, profilePicture, role } = req.body;
+    const validRoles = ['admin', 'client', 'super-admin'];
+    if (!validRoles.includes(role)) {
+        return res.status(400).json({ message: 'Invalid role. Allowed values: admin, client, super-admin' });
+    }
 
     try {
-        const { name, email, password, societe, unite, poste, departement, Cube, active } = req.body;
-        const profilePicture = req.file ? `/uploads/${req.file.filename}` : null;
+        let pool = await sql.connect(dbConfig);
+        const statusBit = status === 1 ? 1 : 0;
+        let userResult = await pool.request()
+            .input('name', sql.NVarChar, name)
+            .input('email', sql.NVarChar, email)
+            .input('password', sql.NVarChar, password)
+            .input('societe_id', sql.Int, societe_id)
+            .input('poste_id', sql.Int, poste_id)
+            .input('departement_id', sql.Int, departement_id)
+            .input('status', sql.Bit, statusBit) // Use BIT instead of NVARCHAR
+            .input('profilePicture', sql.NVarChar, profilePicture)
+            .input('date_creation', sql.DateTime, new Date())
 
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
+            .input('role', sql.NVarChar, role)
+            .query(`
+                INSERT INTO Users (name, email, password, societe_id, poste_id, departement_id, status, date_creation, profilePicture,role)
+                OUTPUT INSERTED.id
+                VALUES (@name, @email, @password, @societe_id, @poste_id, @departement_id, @status, @date_creation, @profilePicture, @role)
+            `);
 
-        const query = `
-        INSERT INTO Users (name, email, password, societe, unite, poste, departement, cube, status, date_creation, profilePicture)
-        VALUES (@name, @email, @password, @societe, @unite, @poste, @departement, @Cube, @active, GETDATE(), @profilePicture)
-      `;
+        let newUserId = userResult.recordset[0].id;
+        res.status(201).json({ message: 'User created successfully', userId: newUserId });
+    } catch (error) {
+        console.error('Error inserting user:', error.message);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+app.post('/api/user_unite', async (req, res) => {
+    const { user_id, unite_id } = req.body;
 
-        const request = new sql.Request();
-        request.input('name', sql.NVarChar, name);
-        request.input('email', sql.NVarChar, email);
-        request.input('password', sql.NVarChar, password);
-        request.input('societe', sql.NVarChar, societe);
-        request.input('unite', sql.NVarChar, unite);
-        request.input('poste', sql.NVarChar, poste);
-        request.input('departement', sql.NVarChar, departement);
-        request.input('Cube', sql.NVarChar, Cube);
-        request.input('active', sql.NVarChar, active ? 'Activé' : 'Désactivé');
-        request.input('profilePicture', sql.NVarChar, profilePicture);
+    try {
+        let pool = await sql.connect(dbConfig);
 
-        await request.query(query);
-        res.status(201).json({ message: 'User added successfully' });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to add user', details: err.message });
+        await pool.request()
+            .input('user_id', sql.Int, user_id)
+            .input('unite_id', sql.Int, unite_id)
+            .query(`INSERT INTO user_unite (user_id, unite_id) VALUES (@user_id, @unite_id)`);
+
+        res.status(201).json({ message: 'User linked to Unite successfully' });
+    } catch (error) {
+        console.error('Error linking user to Unite:', error.message);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+app.post('/api/user_cube', async (req, res) => {
+    const { user_id, cube_id } = req.body;
+
+    try {
+        let pool = await sql.connect(dbConfig);
+
+        await pool.request()
+            .input('user_id', sql.Int, user_id)
+            .input('cube_id', sql.Int, cube_id)
+            .query(`INSERT INTO user_cube (user_id, cube_id) VALUES (@user_id, @cube_id)`);
+
+        res.status(201).json({ message: 'User linked to Cube successfully' });
+    } catch (error) {
+        console.error('Error linking user to Cube:', error.message);
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -113,6 +148,53 @@ app.delete('/api/users/:id', async (req, res) => {
         res.json({ message: "User deleted successfully" });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+app.get('/api/users/:id', async (req, res) => {
+    const userId = req.params.id;
+
+    try {
+        let pool = await sql.connect(dbConfig);
+
+        // Fetch user details
+        let userResult = await pool.request()
+            .input('user_id', sql.Int, userId)
+            .query(`
+                SELECT * FROM Users WHERE id = @user_id
+            `);
+
+        if (userResult.recordset.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        let user = userResult.recordset[0];
+
+        // Fetch associated Unites
+        let unitesResult = await pool.request()
+            .input('user_id', sql.Int, userId)
+            .query(`
+                SELECT u.id, u.nom, u.description 
+                FROM unites u
+                INNER JOIN user_unite uu ON uu.unite_id = u.id
+                WHERE uu.user_id = @user_id
+            `);
+
+        let cubesResult = await pool.request()
+            .input('user_id', sql.Int, userId)
+            .query(`
+                SELECT c.id, c.nom, c.description 
+                FROM cubes c
+                INNER JOIN user_cube uc ON uc.cube_id = c.id
+                WHERE uc.user_id = @user_id
+            `);
+
+        user.unites = unitesResult.recordset;
+        user.cubes = cubesResult.recordset;
+
+        res.status(200).json(user);
+    } catch (error) {
+        console.error('Error fetching user:', error.message);
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -215,7 +297,7 @@ app.get('/api/departements', async (req, res) => {
     try {
         const result = await sql.query(`
             SELECT Departement.id, Departement.nom, Departement.description, 
-                   Societe.nom AS societe  
+                   Departement.societe_id, Societe.nom AS societe 
             FROM Departement 
             JOIN Societe ON Departement.societe_id = Societe.id
         `);
@@ -258,6 +340,37 @@ app.post('/api/departements', async (req, res) => {
     } catch (err) {
         console.error('Database Error:', err); // ✅ Debugging Log
         res.status(500).json({ error: 'Database error', details: err.message });
+    }
+});
+app.get('/api/departements/:societeId', async (req, res) => {
+    try {
+        const { societeId } = req.params;
+
+        console.log(`🔍 Fetching départements for société ID: ${societeId}`);
+
+        // Check if societeId is valid
+        if (isNaN(societeId)) {
+            return res.status(400).json({ error: 'Invalid société ID' });
+        }
+
+        // Query the database
+        const result = await db.query(
+            `SELECT * FROM departement WHERE societe_id = @societeId`,
+            { societeId }
+        );
+
+        // If no records found
+        if (!result.recordset || result.recordset.length === 0) {
+            console.log("❌ No départements found.");
+            return res.status(404).json({ error: 'No départements found for this société' });
+        }
+
+        // Return the results
+        console.log("✅ Departements Loaded:", result.recordset);
+        res.json(result.recordset);
+    } catch (error) {
+        console.error("❌ Error fetching départements:", error);
+        res.status(500).json({ error: 'Failed to fetch départements' });
     }
 });
 
@@ -464,3 +577,44 @@ app.delete('/cubes/:id', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+app.get('/api/user_unite', async (req, res) => {
+    try {
+        const result = await sql.query('SELECT * FROM user_unite');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// POST a new user_unite record
+app.post('/api/user_unite', async (req, res) => {
+    const { user_id, unite_id } = req.body;
+    try {
+        await sql.query`INSERT INTO user_unite (user_id, unite_id) VALUES (${user_id}, ${unite_id})`;
+        res.status(201).send('User_Unite added successfully');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// GET all user_cube records
+app.get('/api/user_cube', async (req, res) => {
+    try {
+        const result = await sql.query('SELECT * FROM user_cube');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// POST a new user_cube record
+app.post('/api/user_cube', async (req, res) => {
+    const { user_id, cube_id } = req.body;
+    try {
+        await sql.query`INSERT INTO user_cube (user_id, cube_id) VALUES (${user_id}, ${cube_id})`;
+        res.status(201).send('User_Cube added successfully');
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+

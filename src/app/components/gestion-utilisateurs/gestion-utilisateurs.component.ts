@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, ViewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { MatTableDataSource } from '@angular/material/table';
 import { MatPaginator } from '@angular/material/paginator';
@@ -17,7 +17,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSortModule } from '@angular/material/sort';
 import { UserService } from '../../services/utilisateur.service';
-
+import { MatCheckboxChange } from '@angular/material/checkbox';
 @Component({
   selector: 'app-gestion-utilisateurs',
   standalone: true,
@@ -47,22 +47,55 @@ export class GestionUtilisateursComponent implements OnInit {
     'name', 'email', 'password', 'societe', 'unite',
     'poste', 'departement', 'menu_cube', 'date_creation', 'status', 'actions'
   ];
-  dataSource = new MatTableDataSource<any>([]);
+  user = {
+    name: '',
+    email: '',
+    password: '',
+    societe_id: 1,
+    poste_id: 2,
+    departement_id: 3,
+    status: 'active',
+    profilePicture: '',
+    unites: [],
+    cubes: [],
+
+    role: '',
+  };
+
   selectedUser: any = null;
+
+  dataSource = new MatTableDataSource<any>([]);
   showEditForm = false;
   showUserForm = false;
   userForm!: FormGroup;
+  filteredUnites: any[] = [];
+  searchUnite: string = '';
+  selectedSocieteId: number | null = null; // Store selected société_id
+  departements: any[] = []; // Store filtered départements
   imagePreview: string | null = null;
   selectedFile: File | null = null;
   selectedUsers: Set<number> = new Set();
+  /**selectedUser: any = {
+    name: '',
+    email: '',
+    password: '',
+    societe_id: null,
+    departement_id: null,
+    poste_id: null,
+    unite_ids: [],
+    menu_cube_ids: [],
+    active: false
+  };**/
+  searchMenuCube: string = '';
+  filteredMenuCubes: any[] = [];
   allSelected = false;
   statusFilter: string = '';
   societes: any[] = [];
-  departements: any[] = [];
   postes: any[] = [];
   unites: any[] = [];
   menuCubes: any[] = [];
   newUser = {
+    role: 'client',
     name: '',
     email: '',
     password: '',
@@ -76,28 +109,196 @@ export class GestionUtilisateursComponent implements OnInit {
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
+  @Output() formClosed = new EventEmitter<void>();
 
   constructor(private userService: UserService, private fb: FormBuilder) { } // ✅ Use UserService instead of HttpClient
 
   ngOnInit(): void {
     this.userForm = this.fb.group({
-      profil: ['', Validators.required],
+      role: ['client'],
       name: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       password: ['', Validators.required],
+      profilePicture: [''],
       societe_id: ['', Validators.required],
       departement_id: ['', Validators.required],
-      poste_id: ['', Validators.required],
-      unite_ids: [[]], // For multiple unite
-      menu_cube_ids: [[]], // For multiple menu cubes
-      active: [false]
+      poste_id: [''],
+      unite_ids: [[]],
+      menu_cube_ids: [[]],
+      active: [true]
     });
-
+    this.loadDropdownData();
     this.loadUsers();
     this.loadSocietes();
     this.loadPostes();
     this.loadCubes();
     this.loadUnites();
+  }
+  loadDropdownData() {
+    this.userService.getSocietes().subscribe(data => this.societes = data);
+    this.userService.getAllDepartements().subscribe(data => this.departements = data);
+    this.userService.getPostes().subscribe(data => this.postes = data);
+    this.userService.getUnites().subscribe(data => {
+      this.unites = data;
+      this.filteredUnites = data;
+    });
+    this.userService.getCubes().subscribe(data => {
+      this.menuCubes = data;
+      this.filteredMenuCubes = data;
+    });
+  }
+  loadUserData(userId: number) {
+    this.userService.getUserUnites(userId).subscribe(uniteIds => {
+      this.userForm.patchValue({ unite_ids: uniteIds });
+    });
+
+    this.userService.getUserCubes(userId).subscribe(cubeIds => {
+      this.userForm.patchValue({ menu_cube_ids: cubeIds });
+    });
+  }
+
+  onSubmit() {
+    if (this.userForm.valid) {
+      const formData = this.userForm.value;
+      formData.role = this.user.role; // Ensure role is included
+      formData.status = this.userForm.value.active ? 1 : 0;
+
+      console.log('Final FormData:', formData); // Debugging log 
+
+      this.userService.createUser(formData).subscribe(response => {
+        console.log('User created:', response);
+        const userId = response.userId;
+
+        formData.unite_ids.forEach((uniteId: number) => {
+          this.userService.addUserUnite(userId, uniteId).subscribe(() => {
+            console.log(`User ${userId} linked to Unite ${uniteId}`);
+          });
+        });
+
+        formData.menu_cube_ids.forEach((cubeId: number) => {
+          this.userService.addUserCube(userId, cubeId).subscribe(() => {
+            console.log(`User ${userId} linked to Cube ${cubeId}`);
+          });
+        });
+
+        alert('User created successfully with Unites and Cubes!');
+      }, error => {
+        console.error('Error:', error);
+        alert('Error creating user');
+      });
+    } else {
+      console.log('Form is invalid');
+    }
+  }
+
+
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => this.imagePreview = reader.result as string;
+      reader.readAsDataURL(file);
+    }
+  }
+
+  updateFilteredUnites(event: any) {
+    const query = event.target.value.toLowerCase();
+    this.filteredUnites = this.unites.filter(unite => unite.nom.toLowerCase().includes(query));
+  }
+
+  updateFilteredMenuCubes(event: any) {
+    const query = event.target.value.toLowerCase();
+    this.filteredMenuCubes = this.menuCubes.filter(cube => cube.nom.toLowerCase().includes(query));
+  }
+  loadUnites() {
+    this.userService.getUnites().subscribe((data) => {
+      this.unites = data;
+      this.filteredUnites = [...this.unites]; // Initialize filtered list
+    });
+  }
+
+  // Select or Deselect All Unités
+
+  // Handle Individual Unite Selection
+  onUniteChange(event: MatCheckboxChange, uniteId: number) {
+    const checked = event.checked;
+    let currentValues: number[] = this.userForm.value.unite_ids || [];
+
+    if (checked) {
+      currentValues.push(uniteId);
+    } else {
+      currentValues = currentValues.filter(id => id !== uniteId);
+    }
+
+    this.userForm.patchValue({ unite_ids: currentValues });
+  }
+
+  // Check if a Unite is Selected
+  isChecked(uniteId: number): boolean {
+    return this.userForm.value.unite_ids?.includes(uniteId);
+  }
+
+  // Select or Deselect All Unites
+  toggleAllUnites() {
+    const allSelected = this.isAllSelected();
+    this.userForm.patchValue({ unite_ids: allSelected ? [] : this.unites.map(u => u.id) });
+  }
+
+  // Check if All Unites are Selected
+  isAllSelected(): boolean {
+    return this.unites.length > 0 && this.userForm.value.unite_ids?.length === this.unites.length;
+  }
+
+
+  // ✅ Step 1: Store the selected société_id when user selects a société
+  onSocieteSelected() {
+    this.selectedSocieteId = this.userForm.value.societe_id; // Store selected société_id
+    console.log("🔹 Selected Société ID:", this.selectedSocieteId);
+    this.filterDepartements(); // Call method to filter départements
+  }
+
+  // ✅ Step 2: Fetch all départements and filter them by selected société_id
+  filterDepartements() {
+    if (!this.selectedSocieteId) {
+      this.departements = [];
+      return;
+    }
+
+    this.userService.getAllDepartements().subscribe(
+      (data) => {
+        console.log("🔹 All Departements from API:", data);
+
+        // Convert both societe_id values to numbers before filtering
+        this.departements = data.filter(dep => Number(dep.societe_id) === Number(this.selectedSocieteId));
+
+        console.log("✅ Filtered Departements:", this.departements);
+      },
+      (error) => {
+        console.error("❌ Error loading départements:", error);
+      }
+    );
+  }
+
+
+
+  selectAllUnites() {
+    if (this.isAllSelected()) {
+      this.userForm.patchValue({ unite_ids: [] });
+    } else {
+      this.userForm.patchValue({ unite_ids: this.unites.map(u => u.id) });
+    }
+  }
+
+
+  onMenuCubeChange(event: Event, cubeId: number) {
+    const checked = (event.target as HTMLInputElement).checked;
+    const currentValues: number[] = this.userForm.value.menu_cube_ids || [];
+
+    if (checked) {
+      this.userForm.patchValue({ menu_cube_ids: [...currentValues, cubeId] });
+    } else {
+      this.userForm.patchValue({ menu_cube_ids: currentValues.filter((id: number) => id !== cubeId) });
+    }
   }
 
 
@@ -111,22 +312,28 @@ export class GestionUtilisateursComponent implements OnInit {
     });
   }
 
+  loadDepartementsBySociete(societeId: number) {
+    if (!societeId) {
+      this.departements = []; // Clear départements if no société is selected
+      return;
+    }
+
+    this.userService.getDepartements(societeId).subscribe(
+      (data) => {
+        console.log('🔹 Departements Loaded:', data);
+        this.departements = data; // Populate the dropdown
+      },
+      (error) => {
+        console.error('❌ Error loading départements:', error);
+        this.departements = []; // Clear départements on error
+      }
+    );
+  }
 
   onSocieteChange(societeId: number) {
     this.userService.getDepartements(societeId).subscribe(data => this.departements = data);
   }
-  // ✅ Handle File Selection
-  onFileSelected(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (file) {
-      this.selectedFile = file;
-      const reader = new FileReader();
-      reader.onload = () => {
-        this.imagePreview = reader.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
-  }
+
 
   // ✅ Toggle User Form
   toggleUserForm() {
@@ -138,16 +345,6 @@ export class GestionUtilisateursComponent implements OnInit {
     this.showUserForm = false;
   }
 
-  // ✅ Add User
-  onSubmit() {
-    if (this.userForm.valid) {
-      const newUser = { ...this.userForm.value, profilePicture: this.selectedFile };
-      this.userService.addUser(newUser).subscribe(() => {
-        this.loadUsers();
-        this.toggleUserForm();
-      });
-    }
-  }
 
   // ✅ Edit User
   editUser(user: any) {
@@ -213,30 +410,23 @@ export class GestionUtilisateursComponent implements OnInit {
     const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
     this.dataSource.filter = filterValue;
   }
-  onAddUser() {
-    console.log('Adding User:', this.newUser); // ✅ Debugging log
 
-    if (!this.newUser.name?.trim() || !this.newUser.email?.trim() || !this.newUser.password?.trim() || !this.newUser.societe_id) {
-      alert('Nom, email, mot de passe et société sont requis.');
-      return;
-    }
-
-    this.userService.addUser(this.newUser).subscribe(() => {
-      this.loadUsers();
-      this.showUserForm = false;
-    });
-  }
   openEditUserForm(user: any) {
-    this.selectedUser = { ...user };
-    console.log('Editing User:', this.selectedUser); // ✅ Debugging log
+    this.selectedUser = {
+      ...user,
+      societe_id: user.societe_id ?? null, // ✅ Ensure societe_id is not undefined
+      departement_id: user.departement_id ?? null,
+      poste_id: user.poste_id ?? null,
+      unite_ids: user.unite_ids ?? [],
+      menu_cube_ids: user.menu_cube_ids ?? [],
+      active: user.active ?? false
+    };
 
-    // Ensure societe_id is assigned correctly
-    const matchingSociete = this.societes.find(s => s.nom === user.societe);
-    this.selectedUser.societe_id = matchingSociete ? matchingSociete.id : null;
+    console.log("🔹 Editing User:", this.selectedUser); // ✅ Debugging log
 
-    console.log('Société ID:', this.selectedUser.societe_id); // ✅ Debugging log
-
-    this.loadDepartements(this.selectedUser.societe_id); // Load corresponding departments
+    if (this.selectedUser.societe_id) {
+      this.loadDepartements(this.selectedUser.societe_id);
+    }
 
     this.showEditForm = true;
   }
@@ -259,14 +449,17 @@ export class GestionUtilisateursComponent implements OnInit {
       return;
     }
 
-    this.userService.getDepartements(societeId).subscribe(data => {
-      console.log("🔹 Departements Loaded:", data); // ✅ Debugging log
-      this.departements = data.map(departement => ({
-        ...departement,
-        id: Number(departement.id)
-      }));
-    });
+    this.userService.getDepartements(societeId).subscribe(
+      data => {
+        console.log("🔹 Departements Loaded:", data); // ✅ Debugging log
+        this.departements = data;
+      },
+      error => {
+        console.error("❌ Error loading départements:", error);
+      }
+    );
   }
+
 
   loadPostes() {
     this.userService.getPostes().subscribe(data => {
@@ -278,25 +471,19 @@ export class GestionUtilisateursComponent implements OnInit {
     });
   }
 
-  loadUnites() {
-    this.userService.getUnites().subscribe(data => {
-      console.log("🔹 Unites Loaded:", data); // ✅ Debugging log
-      this.unites = data.map(unite => ({
-        ...unite,
-        id: Number(unite.id)
-      }));
-    });
-  }
 
   loadCubes() {
     this.userService.getCubes().subscribe(data => {
-      console.log("🔹 Menu Cubes Loaded:", data); // ✅ Debugging log
-      this.menuCubes = data.map(cube => ({
-        ...cube,
-        id: Number(cube.id)
-      }));
+      this.menuCubes = data;
+      this.filteredMenuCubes = [...this.menuCubes]; // Initialize filtered list
     });
   }
 
-
+  toggleAllMenuCubes() {
+    const allSelected = this.isAllSelectedMenuCubes();
+    this.userForm.patchValue({ menu_cube_ids: allSelected ? [] : this.menuCubes.map(c => c.id) });
+  }
+  isAllSelectedMenuCubes(): boolean {
+    return this.menuCubes.length > 0 && this.userForm.value.menu_cube_ids?.length === this.menuCubes.length;
+  }
 }
