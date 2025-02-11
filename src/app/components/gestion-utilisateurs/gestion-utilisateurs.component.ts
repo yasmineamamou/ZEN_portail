@@ -18,11 +18,15 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatSortModule } from '@angular/material/sort';
 import { UserService } from '../../services/utilisateur.service';
 import { MatCheckboxChange } from '@angular/material/checkbox';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatDialog } from '@angular/material/dialog';
+
 @Component({
   selector: 'app-gestion-utilisateurs',
   standalone: true,
   imports: [
     FormsModule,
+    MatMenuModule,
     MatSlideToggleModule,
     MatRadioModule,
     CommonModule,
@@ -44,7 +48,7 @@ import { MatCheckboxChange } from '@angular/material/checkbox';
 })
 export class GestionUtilisateursComponent implements OnInit {
   displayedColumns: string[] = [
-    'name', 'email', 'password', 'societe', 'unite',
+    'select', 'name', 'email', 'password', 'societe', 'unite',
     'poste', 'departement', 'menu_cube', 'date_creation', 'status', 'actions'
   ];
   user = {
@@ -61,8 +65,8 @@ export class GestionUtilisateursComponent implements OnInit {
 
     role: '',
   };
-
   selectedUser: any = null;
+  users: any[] = [];
 
   dataSource = new MatTableDataSource<any>([]);
   showEditForm = false;
@@ -75,17 +79,6 @@ export class GestionUtilisateursComponent implements OnInit {
   imagePreview: string | null = null;
   selectedFile: File | null = null;
   selectedUsers: Set<number> = new Set();
-  /**selectedUser: any = {
-    name: '',
-    email: '',
-    password: '',
-    societe_id: null,
-    departement_id: null,
-    poste_id: null,
-    unite_ids: [],
-    menu_cube_ids: [],
-    active: false
-  };**/
   searchMenuCube: string = '';
   filteredMenuCubes: any[] = [];
   allSelected = false;
@@ -111,7 +104,7 @@ export class GestionUtilisateursComponent implements OnInit {
   @ViewChild(MatSort) sort!: MatSort;
   @Output() formClosed = new EventEmitter<void>();
 
-  constructor(private userService: UserService, private fb: FormBuilder) { } // ✅ Use UserService instead of HttpClient
+  constructor(private userService: UserService, private fb: FormBuilder, private dialog: MatDialog) { } // ✅ Use UserService instead of HttpClient
 
   ngOnInit(): void {
     this.userForm = this.fb.group({
@@ -156,7 +149,28 @@ export class GestionUtilisateursComponent implements OnInit {
       this.userForm.patchValue({ menu_cube_ids: cubeIds });
     });
   }
+  remindUser(user: any) {
+    console.log('🔔 Rappeler:', user);
+    alert(`Rappel envoyé à ${user.name}`);
+  }
 
+  sendEmail(user: any) {
+    console.log('📧 Envoi e-mail:', user);
+    alert(`E-mail envoyé à ${user.email}`);
+  }
+  onFileSelected(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+      this.selectedFile = file;
+
+      // Preview the image
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.imagePreview = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
   onSubmit() {
     if (this.userForm.valid) {
       const formData = this.userForm.value;
@@ -180,7 +194,7 @@ export class GestionUtilisateursComponent implements OnInit {
             console.log(`User ${userId} linked to Cube ${cubeId}`);
           });
         });
-
+        this.loadUsers();
         alert('User created successfully with Unites and Cubes!');
       }, error => {
         console.error('Error:', error);
@@ -190,17 +204,6 @@ export class GestionUtilisateursComponent implements OnInit {
       console.log('Form is invalid');
     }
   }
-
-
-  onFileSelected(event: any) {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => this.imagePreview = reader.result as string;
-      reader.readAsDataURL(file);
-    }
-  }
-
   updateFilteredUnites(event: any) {
     const query = event.target.value.toLowerCase();
     this.filteredUnites = this.unites.filter(unite => unite.nom.toLowerCase().includes(query));
@@ -216,9 +219,6 @@ export class GestionUtilisateursComponent implements OnInit {
       this.filteredUnites = [...this.unites]; // Initialize filtered list
     });
   }
-
-  // Select or Deselect All Unités
-
   // Handle Individual Unite Selection
   onUniteChange(event: MatCheckboxChange, uniteId: number) {
     const checked = event.checked;
@@ -279,8 +279,6 @@ export class GestionUtilisateursComponent implements OnInit {
     );
   }
 
-
-
   selectAllUnites() {
     if (this.isAllSelected()) {
       this.userForm.patchValue({ unite_ids: [] });
@@ -288,7 +286,6 @@ export class GestionUtilisateursComponent implements OnInit {
       this.userForm.patchValue({ unite_ids: this.unites.map(u => u.id) });
     }
   }
-
 
   onMenuCubeChange(event: Event, cubeId: number) {
     const checked = (event.target as HTMLInputElement).checked;
@@ -301,17 +298,43 @@ export class GestionUtilisateursComponent implements OnInit {
     }
   }
 
-
   // ✅ Load all users
   loadUsers() {
-    this.userService.getUsers().subscribe(data => {
-      console.log('Loaded User:', data);
-      this.dataSource = new MatTableDataSource(data);
+    this.userService.getUsers().subscribe(users => {
+      console.log('Loaded Users:', users);
+      this.dataSource = new MatTableDataSource(users);
       this.dataSource.paginator = this.paginator;
       this.dataSource.sort = this.sort;
+
+      // Fetch cube and unite names for each user
+      users.forEach(user => {
+        this.getCubesForUser(user.id);
+        this.getUnitesForUser(user.id);
+      });
     });
   }
-
+  getUnitesForUser(userId: number) {
+    this.userService.getUnitesForUser(userId).subscribe(unites => {
+      // Find the user and add `unite` property
+      const user = this.dataSource.data.find(u => u.id === userId);
+      if (user) {
+        user.unite = unites.join(', ');
+      }
+      // Refresh the table display
+      this.dataSource._updateChangeSubscription();
+    });
+  }
+  getCubesForUser(userId: number) {
+    this.userService.getCubesForUser(userId).subscribe(cubes => {
+      // Find the user and add `menu_cube` property
+      const user = this.dataSource.data.find(u => u.id === userId);
+      if (user) {
+        user.menu_cube = cubes.join(', ');
+      }
+      // Refresh the table display
+      this.dataSource._updateChangeSubscription();
+    });
+  }
   loadDepartementsBySociete(societeId: number) {
     if (!societeId) {
       this.departements = []; // Clear départements if no société is selected
@@ -329,35 +352,27 @@ export class GestionUtilisateursComponent implements OnInit {
       }
     );
   }
-
   onSocieteChange(societeId: number) {
     this.userService.getDepartements(societeId).subscribe(data => this.departements = data);
   }
-
-
   // ✅ Toggle User Form
   toggleUserForm() {
     this.showUserForm = !this.showUserForm;
   }
-
   // ✅ Close User Form
   closeUserForm() {
     this.showUserForm = false;
   }
-
-
   // ✅ Edit User
   editUser(user: any) {
     this.selectedUser = { ...user };
     this.showEditForm = true;
     this.userForm.patchValue(this.selectedUser);
   }
-
   // ✅ Close Edit Form
   closeEditForm() {
     this.showEditForm = false;
   }
-
   // ✅ Update User
   onUpdateUser() {
     if (this.userForm.valid) {
@@ -368,15 +383,41 @@ export class GestionUtilisateursComponent implements OnInit {
       });
     }
   }
+  openEditUserForm(user: any) {
+    this.selectedUser = {
+      ...user,
+      societe_id: user.societe_id ?? null, // ✅ Ensure societe_id is not undefined
+      departement_id: user.departement_id ?? null,
+      poste_id: user.poste_id ?? null,
+      unite_ids: user.unite_ids ?? [],
+      menu_cube_ids: user.menu_cube_ids ?? [],
+      active: user.active ?? false
+    };
+    console.log("🔹 Editing User:", this.selectedUser); // ✅ Debugging log
+    if (this.selectedUser.societe_id) {
+      this.loadDepartements(this.selectedUser.societe_id);
+    }
 
+    this.showEditForm = true;
+  }
   // ✅ Delete User
-  deleteUser(userId: number) {
-    if (confirm('Are you sure you want to delete this user?')) {
-      this.userService.deleteUser(userId).subscribe(() => {
-        this.loadUsers();
+  deleteSelectedUsers() {
+    if (this.selectedUsers.size === 0) {
+      alert("No users selected for deletion!");
+      return;
+    }
+
+    if (confirm('Are you sure you want to delete the selected users?')) {
+      const userIds = Array.from(this.selectedUsers); // Convert Set to array
+      this.userService.deleteUsers(userIds).subscribe(() => {
+        this.selectedUsers.clear(); // Clear selection after deletion
+        this.loadUsers(); // Refresh the user list
+      }, (error) => {
+        console.error("Error deleting users:", error);
       });
     }
   }
+
   toggleSelectAllUsers() {
     if (this.allSelected) {
       this.selectedUsers.clear(); // ✅ Deselect all
@@ -395,7 +436,6 @@ export class GestionUtilisateursComponent implements OnInit {
       this.selectedUsers.add(userId);
     }
   }
-
   // ✅ Filter by Status
   applyStatusFilter(filterValue: string) {
     this.statusFilter = filterValue;
@@ -404,34 +444,11 @@ export class GestionUtilisateursComponent implements OnInit {
     };
     this.dataSource.filter = filterValue;
   }
-
   // ✅ Apply Search Filter
   applyFilter(event: Event) {
     const filterValue = (event.target as HTMLInputElement).value.trim().toLowerCase();
     this.dataSource.filter = filterValue;
   }
-
-  openEditUserForm(user: any) {
-    this.selectedUser = {
-      ...user,
-      societe_id: user.societe_id ?? null, // ✅ Ensure societe_id is not undefined
-      departement_id: user.departement_id ?? null,
-      poste_id: user.poste_id ?? null,
-      unite_ids: user.unite_ids ?? [],
-      menu_cube_ids: user.menu_cube_ids ?? [],
-      active: user.active ?? false
-    };
-
-    console.log("🔹 Editing User:", this.selectedUser); // ✅ Debugging log
-
-    if (this.selectedUser.societe_id) {
-      this.loadDepartements(this.selectedUser.societe_id);
-    }
-
-    this.showEditForm = true;
-  }
-
-
 
   loadSocietes() {
     this.userService.getSocietes().subscribe(data => {
@@ -460,7 +477,6 @@ export class GestionUtilisateursComponent implements OnInit {
     );
   }
 
-
   loadPostes() {
     this.userService.getPostes().subscribe(data => {
       console.log("🔹 Postes Loaded:", data); // ✅ Debugging log
@@ -470,7 +486,6 @@ export class GestionUtilisateursComponent implements OnInit {
       }));
     });
   }
-
 
   loadCubes() {
     this.userService.getCubes().subscribe(data => {

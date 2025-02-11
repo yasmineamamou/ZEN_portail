@@ -383,3 +383,15 @@ select {
     display: flex;
     gap: 15px;
 }
+
+.delete-item {
+    color: red;
+}
+
+.delete-icon {
+    color: red;
+}
+
+.delete-text {
+    font-weight: bold;
+}

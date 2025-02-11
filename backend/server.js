@@ -6,7 +6,6 @@ const multer = require('multer');
 const path = require('path'); // ✅ Add this line
 const port = 3000; // ✅ Define the port number
 const fs = require('fs');
-
 const app = express();
 app.use(cors());
 app.use(express.json()); // Enable JSON body parsing
@@ -35,21 +34,20 @@ sql.connect(dbConfig)
 
 
 
+// ✅ Set up Multer storage configuration
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/'); // Save files in 'uploads' folder
     },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname)); // Rename file with timestamp
     }
 });
 // Start Server
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
 });
-const upload = multer({ storage });
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
+const upload = multer({ storage: storage });
 
 
 app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
@@ -62,6 +60,7 @@ app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
     try {
         let pool = await sql.connect(dbConfig);
         const statusBit = status === 1 ? 1 : 0;
+        const profilePicture = req.file ? `uploads/${req.file.filename}` : null;
         let userResult = await pool.request()
             .input('name', sql.NVarChar, name)
             .input('email', sql.NVarChar, email)
@@ -82,6 +81,7 @@ app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
 
         let newUserId = userResult.recordset[0].id;
         res.status(201).json({ message: 'User created successfully', userId: newUserId });
+
     } catch (error) {
         console.error('Error inserting user:', error.message);
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -124,7 +124,7 @@ app.post('/api/user_cube', async (req, res) => {
 
 app.get('/api/users', async (req, res) => {
     try {
-        const result = await sql.query('SELECT * FROM users');
+        const result = await sql.query('SELECT users.id, users.name, users.email, users.password,users.date_creation ,users.profilePicture,users.role,users.status, Departement.nom AS departement,postes.nom AS postes  ,Societe.nom AS societe FROM Users JOIN Departement ON Users.departement_id = Departement.id JOIN Societe ON Users.societe_id = Societe.id JOIN postes ON Users.poste_id = postes.id ');
 
         // ✅ Fix image URLs before sending response
         const users = result.recordset.map(user => ({
@@ -141,15 +141,23 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Delete User API
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:ids', async (req, res) => {
     try {
+        const userIds = req.params.ids.split(',').map(id => parseInt(id.trim())); // Convert to an array of integers
+        if (userIds.some(isNaN)) {
+            return res.status(400).json({ error: "Invalid user ID(s) provided." });
+        }
+
         await sql.connect(dbConfig);
-        await sql.query`DELETE FROM Users WHERE id = ${req.params.id}`;
-        res.json({ message: "User deleted successfully" });
+        const query = `DELETE FROM Users WHERE id IN (${userIds.join(",")})`;
+        await sql.query(query);
+
+        res.json({ message: "Users deleted successfully" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
 app.get('/api/users/:id', async (req, res) => {
     const userId = req.params.id;
 
@@ -615,6 +623,27 @@ app.post('/api/user_cube', async (req, res) => {
         res.status(201).send('User_Cube added successfully');
     } catch (err) {
         res.status(500).send(err.message);
+    }
+});
+
+
+app.get('/cubes/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query("SELECT nom FROM cube WHERE id_cube = @id");
+
+        if (result.recordset.length > 0) {
+            res.json(result.recordset[0]);
+        } else {
+            res.status(404).json({ error: 'Cube not found' });
+        }
+    } catch (error) {
+        console.error('Error fetching cube:', error);
+        res.status(500).json({ error: 'Database error' });
     }
 });
 

@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 
+import { Observable, forkJoin } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 @Injectable({
     providedIn: 'root' // ✅ Ensures service is globally available
 })
@@ -9,6 +10,11 @@ export class UserService {
     private apiUrl = 'http://localhost:3000/api/users';
     private Url = 'http://localhost:3000';
     private api = 'http://localhost:3000/api';
+    private userCubeApiUrl = 'http://localhost:3000/api/user_cube'; // Junction table API
+    private cubeApiUrl = 'http://localhost:3000/cubes'; // Cube names API
+
+    private userUniteApiUrl = 'http://localhost:3000/api/user_unite'; // Junction table API
+    private uniteApiUrl = 'http://localhost:3000/unites'; // Cube names API
 
     constructor(private http: HttpClient) { }
 
@@ -22,6 +28,8 @@ export class UserService {
     getUser(userId: number): Observable<any> {
         return this.http.get<any>(`${this.apiUrl}/${userId}`);
     }
+
+
     // ✅ Add a new user
     addUser(user: any): Observable<any> {
         const formData = new FormData();
@@ -37,9 +45,12 @@ export class UserService {
     }
 
     // ✅ Delete a user
-    deleteUser(id: number): Observable<any> {
-        return this.http.delete(`${this.apiUrl}/${id}`);
+    deleteUsers(userIds: number[]): Observable<any> {
+        const idsParam = userIds.join(','); // Convert array to comma-separated string
+        return this.http.delete(`${this.apiUrl}/${idsParam}`);
     }
+
+
     getSocietes() {
         return this.http.get<any[]>(`${this.api}/societes`);
     }
@@ -85,4 +96,66 @@ export class UserService {
     createUserCube(userData: any): Observable<any> {
         return this.http.post('http://localhost:3000/api/user_cube', userData);
     }
+    getCubesByUserId(userId: number): Observable<string[]> {
+        return this.http.get<string[]>(`${this.apiUrl}/user/${userId}`);
+    }
+    getCubesForUser(userId: number): Observable<string[]> {
+        return this.http.get<{ user_id: number; cube_id: number }[]>(this.userCubeApiUrl).pipe(
+            map((userCubeData: { user_id: number; cube_id: number }[]) => {
+                // Extract cube IDs related to the given user
+                const cubeIds: number[] = userCubeData
+                    .filter(entry => entry.user_id === userId)
+                    .map(entry => entry.cube_id);
+
+                return cubeIds;
+            }),
+            switchMap((cubeIds: number[]) => {
+                if (cubeIds.length === 0) {
+                    return new Observable<string[]>(observer => {
+                        observer.next(["Aucun"]);
+                        observer.complete();
+                    });
+                }
+
+                // Fetch cube names for these IDs
+                const cubeRequests: Observable<{ nom: string }>[] = cubeIds.map(id =>
+                    this.http.get<{ nom: string }>(`${this.cubeApiUrl}/${id}`)
+                );
+
+                return forkJoin(cubeRequests).pipe(
+                    map((cubes: { nom: string }[]) => cubes.map(cube => cube.nom))
+                );
+            })
+        );
+    }
+    getUnitesForUser(userId: number): Observable<string[]> {
+        return this.http.get<{ user_id: number; unite_id: number }[]>(this.userUniteApiUrl).pipe(
+            map((userUniteData: { user_id: number; unite_id: number }[]) => {
+                // Extract unite IDs related to the given user
+                const uniteIds: number[] = userUniteData
+                    .filter(entry => entry.user_id === userId)
+                    .map(entry => entry.unite_id);
+
+                return uniteIds;
+            }),
+            switchMap((uniteIds: number[]) => {
+                if (uniteIds.length === 0) {
+                    return new Observable<string[]>(observer => {
+                        observer.next(["Aucun"]);
+                        observer.complete();
+                    });
+                }
+
+                // Fetch unite names for these IDs
+                const uniteRequests: Observable<{ nom: string }>[] = uniteIds.map(id =>
+                    this.http.get<{ nom: string }>(`${this.uniteApiUrl}/${id}`)
+                );
+
+                return forkJoin(uniteRequests).pipe(
+                    map((unites: { nom: string }[]) => unites.map(unite => unite.nom))
+                );
+            })
+        );
+    }
+
 }

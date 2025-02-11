@@ -261,7 +261,22 @@
 
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
         <ng-container matColumnDef="select">
-            <th mat-header-cell *matHeaderCellDef> </th>
+            <th mat-header-cell *matHeaderCellDef="let user">
+                <button mat-icon-button [matMenuTriggerFor]="menu">
+                    <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #menu="matMenu">
+                    <button mat-menu-item (click)="remindUser(user)">
+                        <mat-icon>notifications</mat-icon> Rappeler
+                    </button>
+                    <button mat-menu-item (click)="sendEmail(user)">
+                        <mat-icon>email</mat-icon> Envoyer e-mail
+                    </button>
+                    <button mat-menu-item (click)="deleteSelectedUsers()" class="delete-item">
+                        <mat-icon class="delete-icon">delete</mat-icon> <span class="delete-text">Supprimer</span>
+                    </button>
+                </mat-menu>
+            </th>
             <td mat-cell *matCellDef="let user">
                 <mat-checkbox [checked]="selectedUsers.has(user.id)" (change)="toggleSelection(user.id)"></mat-checkbox>
             </td>
@@ -296,7 +311,7 @@
         <!-- Poste Column -->
         <ng-container matColumnDef="poste">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Poste</th>
-            <td mat-cell *matCellDef="let user">{{ user.poste }}</td>
+            <td mat-cell *matCellDef="let user">{{ user.postes }}</td>
         </ng-container>
         <!-- Département Column -->
         <ng-container matColumnDef="departement">
@@ -306,7 +321,10 @@
         <!-- Menu de Cube Column -->
         <ng-container matColumnDef="menu_cube">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Menu de Cube</th>
-            <td mat-cell *matCellDef="let user">{{ user.menu_cube }}</td>
+            <td mat-cell *matCellDef="let user">
+                <span *ngIf="user.menu_cube">{{ user.menu_cube }}</span>
+                <span *ngIf="!user.menu_cube">Chargement...</span>
+            </td>
         </ng-container>
         <!-- Date de Création Column -->
         <ng-container matColumnDef="date_creation">
@@ -330,9 +348,9 @@
                 <button mat-icon-button color="primary" (click)="editUser(user)">
                     <mat-icon>edit</mat-icon>
                 </button>
-                <!--<button mat-icon-button color="warn" (click)="deleteUser(user.id)">
+                <!-- <button mat-icon-button color="warn" (click)="deleteUser(user.id)">
                     <mat-icon>delete</mat-icon>
-                </button>-->
+                </button> -->
             </td>
         </ng-container>
         <!-- Render Header and Rows -->
