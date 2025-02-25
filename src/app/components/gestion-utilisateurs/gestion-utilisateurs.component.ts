@@ -49,23 +49,52 @@ import { MatDialog } from '@angular/material/dialog';
 export class GestionUtilisateursComponent implements OnInit {
   displayedColumns: string[] = [
     'select', 'name', 'email', 'password', 'societe', 'unite',
-    'poste', 'departement', 'menu_cube', 'date_creation', 'status', 'actions'
+    'poste', 'departement', 'menu_cube', 'role', 'status', 'actions'
   ];
-  user = {
+
+  showEditUserForm = false;
+  user: {
+    id: number; // Ensure ID is optional
+    name: string;
+    email: string;
+    password: string;
+    societe_id: number;
+    postes_id: number;
+    departement_id: number;
+    status: boolean;
+    profilePicture: string;
+    unites: number[];
+    cubes: number[];
+    role: string;
+  } = {
+      id: 0, // Default to undefined for new users
+      name: '',
+      email: '',
+      password: '',
+      societe_id: 0,
+      postes_id: 0,
+      departement_id: 0,
+      status: true,
+      profilePicture: '',
+      unites: [],
+      cubes: [],
+      role: ''
+    };
+
+  selectedUser: any = {
     name: '',
     email: '',
     password: '',
-    societe_id: 1,
-    poste_id: 2,
-    departement_id: 3,
-    status: 'active',
-    profilePicture: '',
-    unites: [],
-    cubes: [],
-
+    societe_id: null,
+    postes_id: null,
+    departement_id: null,
+    status: false,
+    profilePicture: null,
     role: '',
+    unite_ids: [],
+    menu_cube_ids: []
   };
-  selectedUser: any = null;
+
   users: any[] = [];
 
   dataSource = new MatTableDataSource<any>([]);
@@ -94,7 +123,7 @@ export class GestionUtilisateursComponent implements OnInit {
     password: '',
     societe_id: null,
     departement_id: null,
-    poste_id: null,
+    postes_id: null,
     unite_ids: [],
     menu_cube_ids: [],
     active: false
@@ -103,22 +132,24 @@ export class GestionUtilisateursComponent implements OnInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
   @Output() formClosed = new EventEmitter<void>();
+  isUpdating: boolean = false;
 
   constructor(private userService: UserService, private fb: FormBuilder, private dialog: MatDialog) { } // ✅ Use UserService instead of HttpClient
 
   ngOnInit(): void {
     this.userForm = this.fb.group({
-      role: ['client'],
+      role: ['', Validators.required],  // Ensure role is part of the form
       name: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       password: ['', Validators.required],
       profilePicture: [''],
       societe_id: ['', Validators.required],
       departement_id: ['', Validators.required],
-      poste_id: [''],
+      postes_id: [''],
       unite_ids: [[]],
       menu_cube_ids: [[]],
-      active: [true]
+      active: [true],
+
     });
     this.loadDropdownData();
     this.loadUsers();
@@ -126,7 +157,114 @@ export class GestionUtilisateursComponent implements OnInit {
     this.loadPostes();
     this.loadCubes();
     this.loadUnites();
+    this.userForm.get('role')?.valueChanges.subscribe(value => {
+      console.log('Role field updated:', value);
+    });
+    if (this.isUpdating) {
+      console.log("Editing user. Current user object:", this.user);
+      if (!this.user?.id) {
+        console.error("Error: User ID is missing in this.user.");
+      }
+    }
   }
+
+
+  updateFilteredUnites(event: any) {
+    const searchTerm = event.target.value.toLowerCase();
+    this.filteredUnites = this.unites.filter(unite => unite.nom.toLowerCase().includes(searchTerm));
+  }
+
+  onEditUser() {
+    if (!this.selectedUser.name.trim() || !this.selectedUser.email.trim() || !this.selectedUser.societe_id) {
+      alert("Le nom, l'email et la société sont requis.");
+      return;
+    }
+
+    const validRoles = ['admin', 'client', 'super-admin'];
+    if (!validRoles.includes(this.selectedUser.role)) {
+      alert("Veuillez sélectionner un rôle valide.");
+      return;
+    }
+
+    const updatedUser = {
+      ...this.selectedUser,
+      status: this.selectedUser.status ? 1 : 0,
+      postes_id: this.selectedUser.postes_id || null, // Ensure it's being sent
+      unite_ids: this.selectedUser.unite_ids || [],
+      menu_cube_ids: this.selectedUser.menu_cube_ids || []
+    };
+
+    console.log("Sending update request with payload:", updatedUser); // Debugging Log
+
+    this.userService.updateUser(this.selectedUser.id, updatedUser)
+      .subscribe(
+        response => {
+          console.log("Update Success:", response);
+          this.loadUsers();
+          this.showEditUserForm = false;
+        },
+        error => {
+          console.error("Update Error:", error);
+          alert("Erreur lors de la mise à jour de l'utilisateur.");
+        }
+      );
+  }
+
+  openEditUserForm(user: any) {
+    console.log('User Object from API:', user);
+    this.selectedUser = { ...user };
+
+    console.log('Editing User:', this.selectedUser); // ✅ Debugging log
+    console.log('Raw Status from API:', user.status);
+
+    // Ensure societe_id is assigned correctly
+    const matchingSociete = this.societes.find(s => s.nom === user.societe);
+    this.selectedUser.societe_id = matchingSociete ? matchingSociete.id : null;
+
+    // Ensure poste_id is assigned correctly
+    const matchingPoste = this.postes.find(p => p.nom === user.postes);
+    this.selectedUser.postes_id = matchingPoste ? matchingPoste.id : null;
+
+    // Ensure departement_id is assigned correctly
+    const matchingDepartement = this.departements.find(d => d.nom === user.departement);
+    this.selectedUser.departement_id = matchingDepartement ? matchingDepartement.id : null;
+
+    this.selectedUser.status = user.status === 1 || user.status === '1' || user.status === true;
+
+    this.selectedUser.unite_ids = user.unites ? user.unites.map((u: any) => u.id) : [];
+
+    // Ensure menu_cube_ids contains only valid IDs
+    this.selectedUser.menu_cube_ids = user.menu_cubes ? user.menu_cubes.map((m: any) => m.id) : [];
+
+    console.log('Converted Status (Boolean):', this.selectedUser.status); // Should print `true` or `false`
+    console.log('Société ID:', this.selectedUser.societe_id);
+    console.log('Poste ID:', this.selectedUser.postes_id);
+    console.log('Département ID:', this.selectedUser.departement_id);
+    const uniteNames = user.unite ? user.unite.split(',').map((u: string) => u.trim()) : [];
+    this.selectedUser.unite_ids = this.unites
+      .filter(unite => uniteNames.includes(unite.nom)) // Find matching unites
+      .map(unite => unite.id); // Extract only IDs
+
+    // 🛠 Convert Menu Cube Names to IDs
+    const menuCubeNames = user.menu_cube ? user.menu_cube.split(',').map((m: string) => m.trim()) : [];
+    this.selectedUser.menu_cube_ids = this.menuCubes
+      .filter((cube: { id: number; nom: string }) => menuCubeNames.includes(cube.nom))
+      .map((cube: { id: number; nom: string }) => cube.id);
+
+    console.log('Processed Unite IDs:', this.selectedUser.unite_ids);
+    console.log('Processed Menu Cube IDs:', this.selectedUser.menu_cube_ids);
+
+    // Patch form values
+    this.userForm.patchValue({
+      unite_ids: this.selectedUser.unite_ids,
+      menu_cube_ids: this.selectedUser.menu_cube_ids,
+    });
+    console.log('Final Form Value:', this.userForm.value);
+
+    this.showEditUserForm = true;
+
+  }
+
   loadDropdownData() {
     this.userService.getSocietes().subscribe(data => this.societes = data);
     this.userService.getAllDepartements().subscribe(data => this.departements = data);
@@ -158,21 +296,33 @@ export class GestionUtilisateursComponent implements OnInit {
     console.log('📧 Envoi e-mail:', user);
     alert(`E-mail envoyé à ${user.email}`);
   }
-  onFileSelected(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
     if (file) {
-      this.selectedFile = file;
-
-      // Preview the image
       const reader = new FileReader();
       reader.onload = () => {
         this.imagePreview = reader.result as string;
+        this.userForm.patchValue({ profilePicture: this.imagePreview }); // Update the form with the new image
       };
       reader.readAsDataURL(file);
     }
   }
+  /* onFileSelecte(event: Event) {
+     const file = (event.target as HTMLInputElement).files?.[0];
+     if (file) {
+       const reader = new FileReader();
+       reader.onload = () => {
+         this.imagePreview = reader.result as string;
+         this.userForm.patchValue({ profilePicture: this.imagePreview });
+       };
+       reader.readAsDataURL(file);
+     }
+   }*/
+
+
   onSubmit() {
     if (this.userForm.valid) {
+
       const formData = this.userForm.value;
       formData.role = this.user.role; // Ensure role is included
       formData.status = this.userForm.value.active ? 1 : 0;
@@ -194,7 +344,6 @@ export class GestionUtilisateursComponent implements OnInit {
             console.log(`User ${userId} linked to Cube ${cubeId}`);
           });
         });
-        this.loadUsers();
         alert('User created successfully with Unites and Cubes!');
       }, error => {
         console.error('Error:', error);
@@ -203,10 +352,7 @@ export class GestionUtilisateursComponent implements OnInit {
     } else {
       console.log('Form is invalid');
     }
-  }
-  updateFilteredUnites(event: any) {
-    const query = event.target.value.toLowerCase();
-    this.filteredUnites = this.unites.filter(unite => unite.nom.toLowerCase().includes(query));
+
   }
 
   updateFilteredMenuCubes(event: any) {
@@ -302,15 +448,24 @@ export class GestionUtilisateursComponent implements OnInit {
   loadUsers() {
     this.userService.getUsers().subscribe(users => {
       console.log('Loaded Users:', users);
+
       this.dataSource = new MatTableDataSource(users);
       this.dataSource.paginator = this.paginator;
       this.dataSource.sort = this.sort;
 
       // Fetch cube and unite names for each user
-      users.forEach(user => {
+      users.forEach((user: { id: number; }) => {
         this.getCubesForUser(user.id);
         this.getUnitesForUser(user.id);
       });
+      this.users = users;
+
+      // Debugging: Check if the missing user is included in the response
+      const missingUser = users.find((u: { id: any; }) => u.id === this.selectedUser.id);
+      console.log("User after update:", missingUser ? missingUser : "User not found in response!");
+    }, error => {
+      console.error("Error loading users:", error);
+
     });
   }
   getUnitesForUser(userId: number) {
@@ -361,45 +516,48 @@ export class GestionUtilisateursComponent implements OnInit {
   }
   // ✅ Close User Form
   closeUserForm() {
-    this.showUserForm = false;
+    this.showUserForm = false;  // Hide the form
+    this.userForm.reset();  // Reset the form fields
+    this.selectedUser = null;  // Clear selected user
+    this.imagePreview = null;  // Reset profile picture preview
   }
+
   // ✅ Edit User
-  editUser(user: any) {
-    this.selectedUser = { ...user };
-    this.showEditForm = true;
-    this.userForm.patchValue(this.selectedUser);
+  editUser(userId: number) {
+    this.userService.getUserById(userId).subscribe(userData => {
+      this.user = userData; // Make sure `this.user` is properly set
+      this.userForm.patchValue(userData); // Populate form fields
+      console.log("User data loaded for editing:", this.user);
+    }, error => {
+      console.error("Error fetching user:", error);
+    });
   }
+
   // ✅ Close Edit Form
   closeEditForm() {
     this.showEditForm = false;
+    this.userForm.reset();
+    this.selectedUser = null;
+    this.imagePreview = null;
   }
   // ✅ Update User
   onUpdateUser() {
     if (this.userForm.valid) {
       const updatedUser = { ...this.selectedUser, ...this.userForm.value };
-      this.userService.updateUser(updatedUser.id, updatedUser).subscribe(() => {
-        this.loadUsers();
-        this.showEditForm = false;
-      });
-    }
-  }
-  openEditUserForm(user: any) {
-    this.selectedUser = {
-      ...user,
-      societe_id: user.societe_id ?? null, // ✅ Ensure societe_id is not undefined
-      departement_id: user.departement_id ?? null,
-      poste_id: user.poste_id ?? null,
-      unite_ids: user.unite_ids ?? [],
-      menu_cube_ids: user.menu_cube_ids ?? [],
-      active: user.active ?? false
-    };
-    console.log("🔹 Editing User:", this.selectedUser); // ✅ Debugging log
-    if (this.selectedUser.societe_id) {
-      this.loadDepartements(this.selectedUser.societe_id);
-    }
 
-    this.showEditForm = true;
+      this.userService.updateUser(updatedUser.id, updatedUser).subscribe(
+        (response) => {
+          console.log('User updated successfully', response);
+          this.closeEditForm();
+        },
+        (error) => {
+          console.error('Error updating user:', error);
+        }
+      );
+    }
   }
+
+
   // ✅ Delete User
   deleteSelectedUsers() {
     if (this.selectedUsers.size === 0) {

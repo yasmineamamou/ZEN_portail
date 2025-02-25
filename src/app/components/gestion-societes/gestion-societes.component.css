@@ -13,9 +13,6 @@
     cursor: pointer;
 }
 
-textarea {
-    height: 200px;
-}
 
 /* ✅ Overlay background */
 .full-page-overlay {
@@ -66,8 +63,10 @@ textarea {
     display: flex;
     justify-content: center;
     margin-top: 20px;
+    width: 37%;
+    margin-right: 30px;
+    padding-top: 30px;
 }
-
 
 /* ✅ Table Styling */
 table {
@@ -92,15 +91,6 @@ mat-form-field {
     width: 250px;
 }
 
-/* ✅ Align Actions on the Right */
-.description-column {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-/* ✅ Buttons in Description Column */
 .actions-container {
     display: flex;
     gap: 10px;
@@ -137,9 +127,10 @@ h2 {
 /* ✅ Proper spacing for form grid */
 .form-grid {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     width: 100%;
-    gap: 20px;
+    padding-left: 120px;
+    padding-top: 60px;
 }
 
 /* ✅ Centering labels and inputs */
@@ -147,15 +138,8 @@ h2 {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding-left: 300px;
-    width: 35%;
-    padding-bottom: 15px;
-}
-
-/* ✅ Ensure the submit button is centered */
-.submit-section {
-    width: 37%;
-    margin-right: 30px;
+    width: 60%;
+    padding-bottom: 10px;
 }
 
 .submit-button {
@@ -171,4 +155,70 @@ h2 {
     background-color: #64bebc !important;
     color: black !important;
     transition: background-color 0.3s ease;
+}
+
+.profile-section {
+    display: flex;
+    justify-content: space-between;
+    /* ✅ Aligns items side by side */
+    align-items: center;
+    /* ✅ Ensures both items are at the same vertical level */
+    gap: 20px;
+    /* ✅ Adds spacing between sections */
+}
+
+.profile-selection-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    /* ✅ Align text and inputs properly */
+}
+
+.profile-picture-container button {
+    margin-top: 10px;
+    background: #007a55;
+    color: white;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.profile-picture:hover {
+    opacity: 0.7;
+    /* ✅ Slight transparency on hover to indicate interactivity */
+}
+
+/* ✅ Prevents clicking inside the form from closing it */
+
+.profile-picture-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100px;
+    /* Adjust based on your needs */
+    height: 100px;
+    border-radius: 50%;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    transition: opacity 0.3s;
+
+    flex-direction: column;
+}
+
+.profile-picture {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+
+    margin-bottom: 10px;
+}
+
+.profile-icon img {
+    width: 50px;
+    height: 50px;
 }

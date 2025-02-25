@@ -47,14 +47,22 @@ import { SocieteService } from '../../services/societe.service';
   styleUrl: './gestion-societes.component.css'
 })
 export class GestionSocietesComponent implements OnInit {
-  displayedColumns: string[] = ['name', 'description'];
+  displayedColumns: string[] = ['name', 'description', 'rne', 'pays', 'adresse', 'Type', 'actions'];
+  imagePreview: string | null = null;
   dataSource = new MatTableDataSource<any>([]);
   showAddSocieteForm = false;
   showEditSocieteForm = false;
   isEditMode = false;
+  newSociete = { nom: '', rne: '', pays: '', adresse: '', Type: '', description: '' };
+  selectedSociete: any = { id: null, nom: '', rne: '', pays: '', adresse: '', Type: '', description: '' };
+  selectedFile!: File;
+  uploadedFilePath!: string;
 
-  newSociete = { nom: '', description: '' };
-  selectedSociete: any = { id: null, nom: '', description: '' };
+  shortLink: string = "";
+  loading: boolean = false; // Flag variable
+  file: File | null = null; // ✅ Allow both File and null
+
+
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -64,6 +72,15 @@ export class GestionSocietesComponent implements OnInit {
   ngOnInit(): void {
     this.loadSocietes();
   }
+  onChange(event: Event) {
+    const inputElement = event.target as HTMLInputElement; // ✅ Type assertion
+    if (inputElement.files && inputElement.files.length > 0) {
+      this.file = inputElement.files[0]; // ✅ Now TypeScript recognizes `files`
+    }
+  }
+
+
+
 
   loadSocietes() {
     this.societeService.getSocietes().subscribe(data => {
@@ -74,9 +91,42 @@ export class GestionSocietesComponent implements OnInit {
     });
   }
 
+
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.file = file; // Store the selected file
+      console.log("Selected file:", file.name);
+    }
+  }
+
+
+  // OnClick of button Upload
+  onUpload() {
+    if (!this.file) { // ✅ Ensure file is selected before upload
+      alert("Please select a file before uploading.");
+      return;
+    }
+
+    this.loading = true; // Start loading
+    console.log("Uploading file:", this.file);
+
+    // this.societeService.upload(this.file).subscribe(
+    //   (event: any) => {
+    //     if (typeof event === 'object') {
+    //       this.shortLink = event.link;
+    //       this.loading = false; // Stop loading
+    //     }
+    //   },
+    //   (error) => {
+    //     console.error("Upload failed:", error);
+    //     this.loading = false;
+    //   }
+    // );
+  }
   openAddSocieteForm() {
     this.showAddSocieteForm = true;
-    this.newSociete = { nom: '', description: '' };
+    this.newSociete = { nom: '', description: '', rne: '', pays: '', adresse: '', Type: '' };
   }
 
   closeAddSocieteForm() {
@@ -98,18 +148,34 @@ export class GestionSocietesComponent implements OnInit {
   closeEditSocieteForm() {
     this.showEditSocieteForm = false;
   }
-
   onAddSociete() {
-    if (!this.newSociete.nom.trim()) {
-      alert('Le nom de la société est requis.');
-      return;
-    }
+    this.societeService.addSociete(this.newSociete).subscribe(res => {
+      console.log("Societe added response:", res); // Debugging log
 
-    this.societeService.addSociete(this.newSociete).subscribe(() => {
+      if (res && res.data && res.data.id) {
+        if (this.file) {
+          this.societeService.upload(this.file, res.data.id).subscribe(
+            (event: any) => {
+              if (typeof event === 'object') {
+                this.shortLink = event.link;
+                this.loading = false; // Stop loading
+              }
+            },
+            (error) => {
+              console.error("Upload failed:", error);
+              this.loading = false;
+            }
+          );
+        }
+      } else {
+        console.error("Error: No ID returned from the server");
+      }
+
       this.loadSocietes();
       this.showAddSocieteForm = false;
     });
   }
+
 
   onEditSociete() {
     if (!this.selectedSociete.nom.trim()) {
@@ -117,19 +183,27 @@ export class GestionSocietesComponent implements OnInit {
       return;
     }
 
-    console.log('Updating Société:', this.selectedSociete); // ✅ Debugging Log
+    this.societeService.updateSociete(this.selectedSociete.id, this.selectedSociete).subscribe(res => {
+      console.log("Société updated successfully:", res);
 
-    this.societeService.updateSociete(this.selectedSociete.id, this.selectedSociete)
-      .subscribe(
-        response => {
-          console.log('Société Updated Successfully:', response); // ✅ Success Log
-          this.loadSocietes();
-          this.showEditSocieteForm = false;
-        },
-        error => {
-          console.error('Edit Error:', error); // ✅ Log error response
-        }
-      );
+      if (this.file) {  // If user uploaded a new file
+        this.societeService.updateOrganigramme(this.file, this.selectedSociete.id).subscribe(
+          (event: any) => {
+            if (event.fileName) { // ✅ Display original file name
+              console.log("File updated successfully:", event.fileName);
+            }
+            this.loading = false;
+          },
+          (error) => {
+            console.error("File update failed:", error);
+            this.loading = false;
+          }
+        );
+      }
+
+      this.loadSocietes();
+      this.showEditSocieteForm = false;
+    });
   }
 
   deleteSociete(id: number) {

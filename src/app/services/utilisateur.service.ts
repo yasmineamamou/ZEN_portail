@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 import { Observable, forkJoin } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
+import { map, switchMap, tap } from 'rxjs/operators';
 @Injectable({
     providedIn: 'root' // ✅ Ensures service is globally available
 })
@@ -29,7 +29,6 @@ export class UserService {
         return this.http.get<any>(`${this.apiUrl}/${userId}`);
     }
 
-
     // ✅ Add a new user
     addUser(user: any): Observable<any> {
         const formData = new FormData();
@@ -43,6 +42,42 @@ export class UserService {
     updateUser(id: number, user: any): Observable<any> {
         return this.http.put(`${this.apiUrl}/${id}`, user);
     }
+
+    updateUserUnite(userId: number, uniteId: number): Observable<any> {
+        return this.http.put(`${this.api}/user_unite`, { user_id: userId, unite_id: uniteId });
+    }
+
+
+    updateUserCube(userId: number, cubeId: number): Observable<any> {
+        return this.http.put(`${this.api}/user_cube`, { user_id: userId, cube_id: cubeId });
+    }
+
+
+    getUserById(userId: number): Observable<any> {
+        return this.http.get<any>(`${this.api}/users/${userId}`).pipe(
+            tap(user => {
+                if (!user || !user.id) {
+                    console.error("API returned user data without an ID:", user);
+                }
+            })
+        );
+    }
+
+
+    // Convert base64 image to Blob
+    dataURItoBlob(dataURI: string): Blob {
+        const byteString = atob(dataURI.split(',')[1]);
+        const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+        const arrayBuffer = new ArrayBuffer(byteString.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        for (let i = 0; i < byteString.length; i++) {
+            uint8Array[i] = byteString.charCodeAt(i);
+        }
+
+        return new Blob([arrayBuffer], { type: mimeString });
+    }
+
 
     // ✅ Delete a user
     deleteUsers(userIds: number[]): Observable<any> {

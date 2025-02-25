@@ -13,12 +13,39 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="custom-label">NOM DE SOCIÉTÉ: *</label>
-                            <input type="text" [(ngModel)]="newSociete.nom" name="nom" required class="custom-input">
+                            <input type="text" [(ngModel)]="newSociete.nom" name="nom" class="custom-input">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="custom-label">RNE:</label>
+                            <input type="text" [(ngModel)]="newSociete.rne" name="rne" class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">Pays:</label>
+                            <input type="text" [(ngModel)]="newSociete.pays" name="pays" class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">Adresse:</label>
+                            <input type="text" [(ngModel)]="newSociete.adresse" name="adresse" class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">Type:</label>
+                            <select [(ngModel)]="newSociete.Type" name="Type" class="custom-input">
+                                <option value="franchisé">Franchisé</option>
+                                <option value="master franchisé">Master Franchisé</option>
+                                <option value="distributeur">Distributeur</option>
+                                <option value="autre">Autre</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label class="custom-label">DESCRIPTION:</label>
                             <textarea [(ngModel)]="newSociete.description" name="description"
                                 class="custom-input"></textarea>
+                        </div>
+                        <div class="text-center">
+                            <input class="form-control" type="file" (change)="onChange($event)">
+
+
                         </div>
                     </div>
 
@@ -51,6 +78,43 @@
                             <textarea [(ngModel)]="selectedSociete.description" name="description"
                                 class="custom-input"></textarea>
                         </div>
+                        <div class="form-group">
+                            <label class="custom-label">RNE:</label>
+                            <input type="text" [(ngModel)]="selectedSociete.rne" name="rne" required
+                                class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">Pays:</label>
+                            <input type="text" [(ngModel)]="selectedSociete.pays" name="pays" class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">Adresse:</label>
+                            <input type="text" [(ngModel)]="selectedSociete.adresse" name="adresse"
+                                class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">Type:</label>
+                            <select [(ngModel)]="selectedSociete.Type" name="Type" class="custom-input">
+                                <option value="franchisé">Franchisé</option>
+                                <option value="master franchisé">Master Franchisé</option>
+                                <option value="distributeur">Distributeur</option>
+                                <option value="autre">Autre</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="organigramme">Organigramme (PDF):</label>
+                            <input id="organigramme" type="file" (change)="onFileSelected($event)">
+                        </div>
+
+                        <!-- Show the current file name (optional) -->
+                        <div *ngIf="selectedSociete.organigramme_path">
+                            <p>Current File:
+                                <a [href]="'http://localhost:3000' + selectedSociete.organigramme_path" target="_blank">
+                                    {{ selectedSociete.organigramme_path.split('/').pop() }}
+                                </a>
+                            </p>
+                        </div>
+
                     </div>
 
                     <!-- Submit Button -->
@@ -71,26 +135,50 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom</th>
             <td mat-cell *matCellDef="let societe"> {{ societe.nom }}</td>
         </ng-container>
-
         <ng-container matColumnDef="description">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
-            <td mat-cell *matCellDef="let societe" class="description-column">
-                <span>{{ societe.description }}</span>
-                <span class="actions-container">
-                    <button mat-icon-button color="primary" (click)="openEditSocieteForm(societe)">
-                        <mat-icon>edit</mat-icon>
-                    </button>
-                    <button mat-icon-button color="warn" (click)="deleteSociete(societe.id)">
-                        <mat-icon>delete</mat-icon>
-                    </button>
-                </span>
-            </td>
+            <td mat-cell *matCellDef="let societe">{{ societe.description }}</td>
         </ng-container>
 
+        <!-- RNE -->
+        <ng-container matColumnDef="rne">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>RNE</th>
+            <td mat-cell *matCellDef="let societe"> {{ societe.rne }}</td>
+        </ng-container>
+
+        <!-- Pays -->
+        <ng-container matColumnDef="pays">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Pays</th>
+            <td mat-cell *matCellDef="let societe"> {{ societe.pays }}</td>
+        </ng-container>
+
+        <!-- Adresse -->
+        <ng-container matColumnDef="adresse">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Adresse</th>
+            <td mat-cell *matCellDef="let societe"> {{ societe.adresse }}</td>
+        </ng-container>
+
+        <!-- Type -->
+        <ng-container matColumnDef="Type">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
+            <td mat-cell *matCellDef="let societe"> {{ societe.Type }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let societe">
+                <button mat-icon-button color="primary" (click)="openEditSocieteForm(societe)">
+                    <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" (click)="deleteSociete(societe.id)">
+                    <mat-icon>delete</mat-icon>
+                </button>
+            </td>
+        </ng-container>
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
     </table>
 
     <!-- Paginator -->
-    <mat-paginator [pageSizeOptions]="[5, 10, 25, 100]" showFirstLastButtons></mat-paginator>
+    <mat-paginator [pageSizeOptions]="[10, 25, 100]" showFirstLastButtons></mat-paginator>
 </div>

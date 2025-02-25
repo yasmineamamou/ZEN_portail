@@ -7,14 +7,18 @@ const path = require('path'); // ✅ Add this line
 const port = 3000; // ✅ Define the port number
 const fs = require('fs');
 const app = express();
+var formidable = require('formidable');
+const router = express.Router(); // ✅ Define router before using it
 app.use(cors());
-app.use(express.json()); // Enable JSON body parsing
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(express.json()); // Enable JSON body parsing 
+app.use(express.urlencoded({ extended: true })); // Middleware for form data
+app.use('/uploads', express.static('uploads'));
 // Ensure "uploads/" directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
+
 
 // ✅ Define dbConfig properly
 const dbConfig = {
@@ -47,7 +51,16 @@ const storage = multer.diskStorage({
 app.listen(port, () => {
     console.log(`Server running on http://localhost:${port}`);
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max size
+    fileFilter: function (req, file, cb) {
+        if (file.mimetype !== 'application/pdf') {
+            return cb(new Error('Only PDF files are allowed!'), false);
+        }
+        cb(null, true);
+    }
+});
 
 
 app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
@@ -60,7 +73,6 @@ app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
     try {
         let pool = await sql.connect(dbConfig);
         const statusBit = status === 1 ? 1 : 0;
-        const profilePicture = req.file ? `uploads/${req.file.filename}` : null;
         let userResult = await pool.request()
             .input('name', sql.NVarChar, name)
             .input('email', sql.NVarChar, email)
@@ -205,39 +217,109 @@ app.get('/api/users/:id', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
-
-app.put('/api/users/:id', async (req, res) => {
+app.put('/api/departements/:id', async (req, res) => {
     try {
-        const userId = req.params.id;
-        const { name, email, password, societe, unite, poste, departement, Cube, active, profilePicture } = req.body;
+        const { id } = req.params;
+        const { nom, description, societe_id } = req.body;
+
+        if (!nom || !societe_id) {
+            return res.status(400).json({ error: 'Nom et Société sont requis' });
+        }
 
         const query = `
-            UPDATE Users 
-            SET name = @name, email = @email, password = @password, societe = @societe, 
-                unite = @unite, poste = @poste, departement = @departement, cube = @Cube, 
-                status = @active, profilePicture = @profilePicture
-            WHERE id = @userId
+            UPDATE Departement 
+            SET nom = @nom, description = @description, societe_id = @societe_id 
+            WHERE id = @id
         `;
 
         const request = new sql.Request();
-        request.input('userId', sql.Int, userId);
-        request.input('name', sql.NVarChar, name);
-        request.input('email', sql.NVarChar, email);
-        request.input('password', sql.NVarChar, password);
-        request.input('societe', sql.NVarChar, societe);
-        request.input('unite', sql.NVarChar, unite);
-        request.input('poste', sql.NVarChar, poste);
-        request.input('departement', sql.NVarChar, departement);
-        request.input('Cube', sql.NVarChar, Cube);
-        request.input('active', sql.NVarChar, active);
-        request.input('profilePicture', sql.NVarChar, profilePicture);
+        request.input('id', sql.Int, id);
+        request.input('nom', sql.NVarChar, nom);
+        request.input('description', sql.NVarChar, description || null);
+        request.input('societe_id', sql.Int, societe_id);
 
         await request.query(query);
-        res.json({ message: 'User updated successfully' });
+        res.json({ message: 'Département mis à jour avec succès' });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to update user', details: err.message });
+        res.status(500).json({ error: 'Database error', details: err.message });
     }
 });
+app.put('/api/users/:id', upload.single('profilePicture'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("Received Update Request for User ID:", id);
+        console.log("Request Body:", req.body);
+
+        const { name, email, password, societe_id, poste_id, departement_id, status, profilePicture, role, unite_ids, menu_cube_ids } = req.body;
+
+        const validRoles = ['admin', 'client', 'super-admin'];
+        if (!validRoles.includes(role)) {
+            return res.status(400).json({ message: 'Invalid role. Allowed values: admin, client, super-admin' });
+        }
+
+        let pool = await sql.connect(dbConfig);
+
+        const statusBit = status ? 1 : 0;
+
+        // 🔹 **1. Update Users Table**
+        await pool.request()
+            .input('id', sql.Int, id)
+            .input('name', sql.NVarChar, name)
+            .input('email', sql.NVarChar, email)
+            .input('password', sql.NVarChar, password)
+            .input('societe_id', sql.Int, societe_id)
+            .input('poste_id', sql.Int, poste_id)
+            .input('departement_id', sql.Int, departement_id)
+            .input('status', sql.Bit, statusBit)
+            .input('profilePicture', sql.NVarChar, profilePicture)
+            .input('role', sql.NVarChar, role)
+            .query(`
+                UPDATE Users 
+                SET name = @name, email = @email, password = @password, societe_id = @societe_id, 
+                    poste_id = @poste_id, departement_id = @departement_id, 
+                    status = @status, profilePicture = @profilePicture, role = @role
+                WHERE id = @id
+            `);
+
+        // 🔹 **2. Delete Old Unite Associations**
+        await pool.request()
+            .input('user_id', sql.Int, id)
+            .query(`DELETE FROM user_unite WHERE user_id = @user_id`);
+
+        // 🔹 **3. Insert New Unite Associations**
+        if (unite_ids && unite_ids.length > 0) {
+            for (let unite_id of unite_ids) {
+                await pool.request()
+                    .input('user_id', sql.Int, id)
+                    .input('unite_id', sql.Int, unite_id)
+                    .query(`INSERT INTO user_unite (user_id, unite_id) VALUES (@user_id, @unite_id)`);
+            }
+        }
+
+        // 🔹 **4. Delete Old Cube Associations**
+        await pool.request()
+            .input('user_id', sql.Int, id)
+            .query(`DELETE FROM user_cube WHERE user_id = @user_id`);
+
+        // 🔹 **5. Insert New Cube Associations**
+        if (menu_cube_ids && menu_cube_ids.length > 0) {
+            for (let cube_id of menu_cube_ids) {
+                await pool.request()
+                    .input('user_id', sql.Int, id)
+                    .input('cube_id', sql.Int, cube_id)
+                    .query(`INSERT INTO user_cube (user_id, cube_id) VALUES (@user_id, @cube_id)`);
+            }
+        }
+
+        res.json({ message: 'User and related tables updated successfully' });
+
+    } catch (err) {
+        console.error("Update Error:", err);
+        res.status(500).json({ error: 'Database error', details: err.message });
+    }
+});
+
+
 
 app.get('/api/societes', async (req, res) => {
     try {
@@ -247,25 +329,106 @@ app.get('/api/societes', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+app.post('/api/upload-organigramme/:id', (req, res) => {
+    const societeId = req.params.id;
+    if (!societeId) {
+        return res.status(400).json({ message: "Société ID is required" });
+    }
+
+    const form = new formidable.IncomingForm();
+    form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
+    form.keepExtensions = true;
+
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            return res.status(500).json({ message: 'File upload failed', error: err });
+        }
+
+        console.log("Files received:", files);
+
+        const fileArray = files.file;
+        if (!fileArray || fileArray.length === 0) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const file = fileArray[0]; // Get the uploaded file
+        const originalFileName = file.originalFilename; // ✅ Keep the original name
+        const fileExtension = path.extname(originalFileName); // Extract extension
+        const newFileName = `${societeId}_${originalFileName}`; // Use original name with ID
+        const newPath = path.join(form.uploadDir, newFileName);
+        const dbFilePath = `/uploads/${newFileName}`; // Store relative path in DB
+
+        try {
+            // 🔹 Get the old file path from the database
+            const selectQuery = `SELECT organigramme_path FROM Societe WHERE id = @id`;
+            const request = new sql.Request();
+            request.input('id', sql.Int, societeId);
+            const result = await request.query(selectQuery);
+
+            if (result.recordset.length > 0 && result.recordset[0].organigramme_path) {
+                const oldFilePath = path.join(__dirname, result.recordset[0].organigramme_path);
+                if (fs.existsSync(oldFilePath)) {
+                    fs.unlinkSync(oldFilePath); // Delete old file
+                }
+            }
+
+            // Move the uploaded file to the correct location
+            fs.rename(file.filepath, newPath, async (err) => {
+                if (err) {
+                    return res.status(500).json({ message: 'Error moving file', error: err });
+                }
+
+                // ✅ Update the database with the original file name
+                const updateQuery = `
+                    UPDATE Societe 
+                    SET organigramme_path = @organigramme_path 
+                    WHERE id = @id
+                `;
+                request.input('organigramme_path', sql.NVarChar, dbFilePath);
+                await request.query(updateQuery);
+
+                res.status(200).json({
+                    message: 'File uploaded and path updated successfully',
+                    fileName: originalFileName, // ✅ Return the original file name
+                    filePath: dbFilePath
+                });
+            });
+
+        } catch (dbErr) {
+            res.status(500).json({ message: "Database update failed", error: dbErr.message });
+        }
+    });
+});
+
 
 app.post('/api/societes', async (req, res) => {
     try {
-        const { nom, description } = req.body;
+        const { nom, description, rne, pays, adresse, Type } = req.body;
 
         const query = `
-            INSERT INTO Societe (nom, description) 
-            VALUES (@nom, @description)
+            INSERT INTO Societe (nom, description, rne, pays, adresse, Type) 
+            OUTPUT INSERTED.id
+            VALUES (@nom, @description, @rne, @pays, @adresse, @Type)
         `;
         const request = new sql.Request();
         request.input('nom', sql.NVarChar, nom);
         request.input('description', sql.NVarChar, description);
+        request.input('rne', sql.NVarChar, rne);
+        request.input('pays', sql.NVarChar, pays);
+        request.input('adresse', sql.NVarChar, adresse);
+        request.input('Type', sql.NVarChar, Type);
+        const result = await request.query(query);
 
-        await request.query(query);
-        res.status(201).json({ message: 'Société added successfully' });
+        if (result.recordset.length > 0) {
+            res.status(201).json({ message: 'Société added successfully', data: { id: result.recordset[0].id } });
+        } else {
+            res.status(500).json({ error: 'Insertion failed' });
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
 
 app.delete('/api/societes/:id', async (req, res) => {
     try {
@@ -280,26 +443,33 @@ app.delete('/api/societes/:id', async (req, res) => {
 app.put('/api/societes/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { nom, description } = req.body;
+        const { nom, description, rne, pays, adresse, Type } = req.body;
 
         if (!id || !nom) {
             return res.status(400).json({ error: 'ID and nom are required.' });
         }
 
+        const query = `
+            UPDATE Societe 
+            SET nom = @nom, description = @description, rne = @rne, pays = @pays, adresse = @adresse, Type = @Type 
+            WHERE id = @id
+        `;
         const request = new sql.Request();
         request.input('id', sql.Int, id);
         request.input('nom', sql.NVarChar, nom);
-        request.input('description', sql.NVarChar, description || null);
+        request.input('description', sql.NVarChar, description);
+        request.input('rne', sql.NVarChar, rne);
+        request.input('pays', sql.NVarChar, pays);
+        request.input('adresse', sql.NVarChar, adresse);
+        request.input('Type', sql.NVarChar, Type);
 
-        const query = `UPDATE Societes SET nom = @nom, description = @description WHERE id = @id`;
         await request.query(query);
-
         res.json({ message: 'Société updated successfully.' });
     } catch (err) {
-        console.error('Update Error:', err);
         res.status(500).json({ error: 'Failed to update Société' });
     }
 });
+
 
 app.get('/api/departements', async (req, res) => {
     try {
@@ -382,33 +552,7 @@ app.get('/api/departements/:societeId', async (req, res) => {
     }
 });
 
-app.put('/api/departements/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { nom, description, societe_id } = req.body;
 
-        if (!nom || !societe_id) {
-            return res.status(400).json({ error: 'Nom et Société sont requis' });
-        }
-
-        const query = `
-            UPDATE Departement 
-            SET nom = @nom, description = @description, societe_id = @societe_id 
-            WHERE id = @id
-        `;
-
-        const request = new sql.Request();
-        request.input('id', sql.Int, id);
-        request.input('nom', sql.NVarChar, nom);
-        request.input('description', sql.NVarChar, description || null);
-        request.input('societe_id', sql.Int, societe_id);
-
-        await request.query(query);
-        res.json({ message: 'Département mis à jour avec succès' });
-    } catch (err) {
-        res.status(500).json({ error: 'Database error', details: err.message });
-    }
-});
 
 app.delete('/api/departements/:id', async (req, res) => {
     try {

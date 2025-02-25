@@ -174,86 +174,133 @@
         </div>
     </div>
     <!-- Edit User Modal (Appears on Edit Button Click) -->
-    <div *ngIf="showEditForm" class="full-page-overlay" (click)="closeEditForm()">
+    <!-- Edit User Modal (Same Structure as Add Form) -->
+    <div *ngIf="showEditUserForm" class="full-page-overlay" (click)="closeEditForm()">
         <div class="user-form" (click)="$event.stopPropagation()">
-            <h2 class="form-title">Modifier Utilisateur</h2>
-
-            <form [formGroup]="userForm" (ngSubmit)="onUpdateUser()">
-                <div class="profile-section">
-                    <!-- Left: Profile Selection -->
-                    <div class="profile-selection-container">
-                        <label class="form-label">PROFIL* :</label>
-                        <mat-radio-group formControlName="profil" class="radio-group">
-                            <mat-radio-button value="admin">ADMIN</mat-radio-button>
-                            <mat-radio-button value="client">CLIENT</mat-radio-button>
-                            <mat-radio-button value="super-admin">SUPER ADMIN</mat-radio-button>
-                        </mat-radio-group>
-                    </div>
-
-                    <!-- Right: Profile Picture -->
-                    <div class="profile-picture-container">
-                        <img [src]="imagePreview || selectedUser?.profilePicture || 'assets/default-avatar.png'"
-                            class="profile-picture" alt="Profile Picture">
-                        <input type="file" (change)="onFileSelected($event)" accept="image/*" hidden #fileInput>
-                        <button type="button" mat-stroked-button (click)="fileInput.click()">Changer Photo</button>
+            <form #editUserForm="ngForm" (ngSubmit)="onEditUser()" novalidate>
+                <!-- Role Selection -->
+                <div class="profile-selection-container">
+                    <label class="form-label" style="font-weight: bold;">PROFIL* :</label>
+                    <mat-radio-group [(ngModel)]="selectedUser.role" name="role" required>
+                        <mat-radio-button *ngFor="let r of ['admin', 'client', 'super-admin']" [value]="r">
+                            {{ r.toUpperCase() }}
+                        </mat-radio-button>
+                    </mat-radio-group>
+                    <div *ngIf="!selectedUser.role" class="error-message">
+                        Sélectionnez un profil.
                     </div>
                 </div>
 
                 <div class="form-container">
                     <div class="form-grid">
+                        <!-- Name & Email -->
                         <div class="form-group">
                             <label class="custom-label">NOM ET PRÉNOM*</label>
-                            <input matInput formControlName="name" required class="custom-input">
+                            <input type="text" [(ngModel)]="selectedUser.name" name="name" required
+                                class="custom-input">
                         </div>
                         <div class="form-group">
                             <label class="custom-label">E-MAIL*</label>
-                            <input matInput type="email" formControlName="email" required class="custom-input">
+                            <input type="email" [(ngModel)]="selectedUser.email" name="email" required
+                                class="custom-input">
                         </div>
+                        <!-- Password (optional for edit) -->
                         <div class="form-group">
-                            <label class="custom-label">MOT DE PASSE*</label>
-                            <input matInput type="password" formControlName="password" required class="custom-input">
+                            <label class="custom-label">MOT DE PASSE</label>
+                            <input type="password" [(ngModel)]="selectedUser.password" name="password"
+                                class="custom-input">
                         </div>
+                        <!-- Société -->
                         <div class="form-group">
                             <label class="custom-label">SOCIÉTÉ*</label>
-                            <select formControlName="societe" required class="custom-select">
-                                <option value="zen">ZEN Group</option>
+                            <select [(ngModel)]="selectedUser.societe_id" name="societe_id" required
+                                class="custom-select">
+                                <option *ngFor="let societe of societes" [value]="societe.id"
+                                    [selected]="societe.id === selectedUser.societe_id">
+                                    {{ societe.nom }}
+                                </option>
                             </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="custom-label">POSTE*</label>
-                            <input matInput formControlName="poste" required class="custom-input">
                         </div>
                         <div class="form-group">
                             <label class="custom-label">DÉPARTEMENT*</label>
-                            <select formControlName="departement" required class="custom-select">
-                                <option value="rh">RH</option>
-                                <option value="commercial">Commercial</option>
+                            <select [(ngModel)]="selectedUser.departement_id" name="departement_id" required
+                                class="custom-select">
+                                <option *ngFor="let departement of departements" [value]="departement.id"
+                                    [selected]="departement.id === selectedUser.departement_id">
+                                    {{ departement.nom }}
+                                </option>
                             </select>
                         </div>
+                        <!-- Poste -->
                         <div class="form-group">
-                            <label class="custom-label">UNITÉ*</label>
-                            <input matInput formControlName="unite" required class="custom-input">
-                        </div>
-                        <div class="form-group">
-                            <label class="custom-label">MENU DE CUBE</label>
-                            <select formControlName="menuCube" class="custom-select">
-                                <option value="option1">Option 1</option>
+                            <label class="custom-label">POSTE*</label>
+                            <select [(ngModel)]="selectedUser.postes_id" name="postes_id" required
+                                class="custom-select">
+                                <option *ngFor="let poste of postes" [value]="poste.id"
+                                    [selected]="poste.id === selectedUser.postes_id">
+                                    {{ poste.nom }}
+                                </option>
                             </select>
                         </div>
-                    </div>
 
-                    <!-- Activation Toggle -->
-                    <div class="activation-section">
-                        <label class="custom-label">ACTIVÉ* :</label>
-                        <mat-slide-toggle formControlName="active"></mat-slide-toggle>
-                    </div>
+                        <!-- Unité Multi-Select-->
+                        <form [formGroup]="userForm">
+                            <div class="form-container">
+                                <div class="form-grid">
+                                    <!-- Unités Multi-Selection -->
+                                    <div class="form-group">
+                                        <label class="custom-label">UNITÉ*</label>
+                                        <mat-form-field appearance="outline">
+                                            <mat-select formControlName="unite_ids" multiple
+                                                panelClass="custom-dropdown-panel">
+                                                <mat-form-field>
+                                                    <mat-label>Rechercher ...</mat-label>
+                                                    <input matInput (input)="updateFilteredUnites($event)">
+                                                </mat-form-field>
+                                                <mat-option (click)="toggleAllUnites()">Sélectionner Tous</mat-option>
+                                                <mat-option *ngFor="let unite of filteredUnites" [value]="unite.id">
+                                                    {{ unite.nom }}
+                                                </mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+                                    </div>
 
-                    <!-- Submit Button -->
-                    <div class="submit-section">
-                        <button mat-raised-button class="submit-button" type="submit" [disabled]="userForm.invalid">
-                            MODIFIER
-                        </button>
+                                    <!-- Menu Cube Multi-Selection -->
+                                    <div class="form-group">
+                                        <label class="custom-label">MENU CUBE*</label>
+                                        <mat-form-field appearance="outline">
+                                            <mat-select formControlName="menu_cube_ids" multiple
+                                                panelClass="custom-dropdown-panel">
+                                                <mat-form-field>
+                                                    <mat-label>Rechercher ...</mat-label>
+                                                    <input matInput (input)="updateFilteredMenuCubes($event)">
+                                                </mat-form-field>
+                                                <mat-option (click)="toggleAllMenuCubes()">Sélectionner
+                                                    Tous</mat-option>
+                                                <mat-option *ngFor="let cube of filteredMenuCubes" [value]="cube.id">
+                                                    {{ cube.nom }}
+                                                </mat-option>
+                                            </mat-select>
+                                        </mat-form-field>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
                     </div>
+                </div>
+
+                <!-- Activation Toggle -->
+                <!-- Activation Toggle -->
+                <div class="activation-section">
+                    <label class="custom-label">ACTIVÉ* :</label>
+                    <mat-slide-toggle [(ngModel)]="selectedUser.status" [checked]="selectedUser.status"
+                        name="status"></mat-slide-toggle>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="submit-section">
+                    <button mat-raised-button class="submit-button" type="submit">MODIFIER</button>
                 </div>
             </form>
         </div>
@@ -326,11 +373,15 @@
                 <span *ngIf="!user.menu_cube">Chargement...</span>
             </td>
         </ng-container>
-        <!-- Date de Création Column -->
+        <ng-container matColumnDef="role">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Role</th>
+            <td mat-cell *matCellDef="let user">{{ user.role }}</td>
+        </ng-container>
+        <!-- Date de Création Column  
         <ng-container matColumnDef="date_creation">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Date de Création</th>
             <td mat-cell *matCellDef="let user">{{ user.date_creation | date:'dd/MM/yyyy' }}</td>
-        </ng-container>
+        </ng-container>-->
         <!-- Status Column -->
         <ng-container matColumnDef="status">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
@@ -345,7 +396,7 @@
         <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>Actions</th>
             <td mat-cell *matCellDef="let user">
-                <button mat-icon-button color="primary" (click)="editUser(user)">
+                <button mat-icon-button color="primary" (click)="openEditUserForm(user)">
                     <mat-icon>edit</mat-icon>
                 </button>
                 <!-- <button mat-icon-button color="warn" (click)="deleteUser(user.id)">
