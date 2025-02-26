@@ -7,8 +7,7 @@ import { Observable, throwError } from 'rxjs';
 })
 export class SocieteService {
     private apiUrl = 'http://localhost:3000/api/societes';
-    private baseUrl = 'http://localhost:3000'; // Update with your actual backend URL
-    private uploadUrl = 'http://localhost:3000/api/upload';
+    private baseUrl = 'http://localhost:3000'; // Update with your actual backend URL 
     constructor(private http: HttpClient) { }
 
     getSocietes(): Observable<any[]> {
@@ -64,8 +63,5 @@ export class SocieteService {
 
         return this.http.post(`${this.baseUrl}/api/upload-organigramme/${id}`, formData); // ✅ Use correct endpoint
     }
-
-
-
 }
 

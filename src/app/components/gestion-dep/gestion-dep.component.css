@@ -50,7 +50,7 @@ textarea {
 .form-title {
     font-size: 18px;
     font-weight: bold;
-    margin-bottom: 15px;
+    margin-bottom: 5px;
     color: #1b9c98;
 }
 
@@ -146,7 +146,6 @@ h2 {
     justify-content: center;
     align-items: center;
     width: 100%;
-    gap: 15px;
 }
 
 /* ✅ Form Grid Layout */
@@ -154,7 +153,6 @@ h2 {
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
-    gap: 20px;
 }
 
 /* ✅ Centering Labels & Inputs */

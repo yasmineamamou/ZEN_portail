@@ -43,15 +43,20 @@ import { DepartementService } from '../../services/departement.service';
   styleUrl: './gestion-dep.component.css'
 })
 export class GestionDepComponent implements OnInit {
-  displayedColumns: string[] = ['name', 'description', 'societe'];
+  displayedColumns: string[] = ['name', 'societe'];
   dataSource = new MatTableDataSource<any>([]);
   societes: any[] = [];
   showAddDepartementForm = false;
   showEditDepartementForm = false;
   isEditMode = false;
-  newDepartement = { nom: '', description: '', societe_id: null }; // ✅ Ensure correct structure
+  newDepartement = { nom: '', societe_id: null }; // ✅ Ensure correct structure
 
-  selectedDepartement: any = { id: null, nom: '', description: '', societe_id: null };
+  selectedDepartement: any = { id: null, nom: '', societe_id: null };
+
+  shortLink: string = "";
+  loading: boolean = false; // Flag variable
+  file: File | null = null; // ✅ Allow both File and null
+
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -83,7 +88,7 @@ export class GestionDepComponent implements OnInit {
 
   openAddDepartementForm() {
     this.showAddDepartementForm = true;
-    this.newDepartement = { nom: '', description: '', societe_id: null };
+    this.newDepartement = { nom: '', societe_id: null };
   }
 
   closeAddDepartementForm() {
@@ -108,29 +113,72 @@ export class GestionDepComponent implements OnInit {
     this.showEditDepartementForm = false;
   }
   onAddDepartement() {
-    console.log('Adding Departement:', this.newDepartement); // ✅ Debugging log
+    this.departementService.addDepartement(this.newDepartement).subscribe(res => {
+      console.log("Departement added response:", res);
 
-    if (!this.newDepartement.nom?.trim() || !this.newDepartement.societe_id) {
-      alert('Le nom et la société sont requis.');
-      return;
-    }
+      if (res && res.data && res.data.id) {
+        console.log("Uploading file for Departement ID:", res.data.id); // ✅ Debugging log
+        if (this.file) {
+          this.departementService.uploadOrganigrammeDep(this.file, res.data.id).subscribe(
+            (event: any) => {
+              console.log("File uploaded successfully:", event.fileName); // ✅ Log success
+              this.loading = false;
+            },
+            (error) => {
+              console.error("Upload failed:", error);
+              this.loading = false;
+            }
+          );
+        }
+      } else {
+        console.error("Error: No ID returned from the server");
+      }
 
-    this.departementService.addDepartement(this.newDepartement).subscribe(() => {
       this.loadDepartements();
       this.showAddDepartementForm = false;
     });
   }
+
   onEditDepartement() {
     if (!this.selectedDepartement.nom.trim() || !this.selectedDepartement.societe_id) {
-      alert('Le nom et la société sont requis.');
+      alert('Le nom et la departement sont requis.');
       return;
     }
 
-    this.departementService.updateDepartement(this.selectedDepartement.id, this.selectedDepartement)
-      .subscribe(() => {
-        this.loadDepartements();
-        this.showEditDepartementForm = false;
-      });
+    this.departementService.updateDepartement(this.selectedDepartement.id, this.selectedDepartement).subscribe(res => {
+      console.log("departement updated successfully:", res);
+
+      if (this.file) {  // If user uploaded a new file
+        this.departementService.updateOrganigramme(this.file, this.selectedDepartement.id).subscribe(
+          (event: any) => {
+            if (event.fileName) { // ✅ Display original file name
+              console.log("File updated successfully:", event.fileName);
+            }
+            this.loading = false;
+          },
+          (error) => {
+            console.error("File update failed:", error);
+            this.loading = false;
+          }
+        );
+      }
+      this.loadDepartements();
+      this.showEditDepartementForm = false;
+    });
+  }
+
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.file = file; // Store the selected file
+      console.log("Selected file:", file.name);
+    }
+  }
+  onChange(event: Event) {
+    const inputElement = event.target as HTMLInputElement; // ✅ Type assertion
+    if (inputElement.files && inputElement.files.length > 0) {
+      this.file = inputElement.files[0]; // ✅ Now TypeScript recognizes `files`
+    }
   }
 
   deleteDepartement(id: number) {

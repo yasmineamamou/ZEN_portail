@@ -42,13 +42,11 @@
                             <textarea [(ngModel)]="newSociete.description" name="description"
                                 class="custom-input"></textarea>
                         </div>
-                        <div class="text-center">
+                        <div class="form-group">
+                            <label class="custom-label">Organigramme de Societe:</label>
                             <input class="form-control" type="file" (change)="onChange($event)">
-
-
                         </div>
                     </div>
-
                     <!-- Submit Button -->
                     <div class="submit-section">
                         <button mat-raised-button class="submit-button" type="submit"
@@ -101,8 +99,8 @@
                                 <option value="autre">Autre</option>
                             </select>
                         </div>
-                        <div>
-                            <label for="organigramme">Organigramme (PDF):</label>
+                        <div class="form-group">
+                            <label class="custom-label">Organigramme de societe :</label>
                             <input id="organigramme" type="file" (change)="onFileSelected($event)">
                         </div>
 
@@ -114,7 +112,6 @@
                                 </a>
                             </p>
                         </div>
-
                     </div>
 
                     <!-- Submit Button -->
@@ -163,6 +160,8 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Type</th>
             <td mat-cell *matCellDef="let societe"> {{ societe.Type }}</td>
         </ng-container>
+
+
 
         <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>Actions</th>

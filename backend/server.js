@@ -217,33 +217,7 @@ app.get('/api/users/:id', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
-app.put('/api/departements/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { nom, description, societe_id } = req.body;
 
-        if (!nom || !societe_id) {
-            return res.status(400).json({ error: 'Nom et Société sont requis' });
-        }
-
-        const query = `
-            UPDATE Departement 
-            SET nom = @nom, description = @description, societe_id = @societe_id 
-            WHERE id = @id
-        `;
-
-        const request = new sql.Request();
-        request.input('id', sql.Int, id);
-        request.input('nom', sql.NVarChar, nom);
-        request.input('description', sql.NVarChar, description || null);
-        request.input('societe_id', sql.Int, societe_id);
-
-        await request.query(query);
-        res.json({ message: 'Département mis à jour avec succès' });
-    } catch (err) {
-        res.status(500).json({ error: 'Database error', details: err.message });
-    }
-});
 app.put('/api/users/:id', upload.single('profilePicture'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -474,7 +448,7 @@ app.put('/api/societes/:id', async (req, res) => {
 app.get('/api/departements', async (req, res) => {
     try {
         const result = await sql.query(`
-            SELECT Departement.id, Departement.nom, Departement.description, 
+            SELECT Departement.id, Departement.nom, organigramme_dep,
                    Departement.societe_id, Societe.nom AS societe 
             FROM Departement 
             JOIN Societe ON Departement.societe_id = Societe.id
@@ -487,39 +461,127 @@ app.get('/api/departements', async (req, res) => {
         res.status(500).json({ error: 'Database error', details: err.message });
     }
 });
-
-app.post('/api/departements', async (req, res) => {
+app.put('/api/departements/:id', async (req, res) => {
     try {
-        const { nom, description, societe_id } = req.body;
+        const { id } = req.params;
+        const { nom, societe_id } = req.body;
 
-        // ✅ Debugging Log: Check received data
-        console.log('Received Data:', req.body);
-
-        // Validate Required Fields
-        if (!nom || !societe_id) {
-            console.error('Validation Error: Nom and Société are required');
-            return res.status(400).json({ error: 'Nom and Société are required' });
+        if (!id || !nom) {
+            return res.status(400).json({ error: 'ID and nom are required.' });
         }
 
         const query = `
-            INSERT INTO Departement (nom, description, societe_id) 
-            VALUES (@nom, @description, @societe_id)
+            UPDATE departement 
+            SET nom = @nom, societe_id = @societe_id
+            WHERE id = @id
         `;
-
         const request = new sql.Request();
+        request.input('id', sql.Int, id);
         request.input('nom', sql.NVarChar, nom);
-        request.input('description', sql.NVarChar, description || null);
         request.input('societe_id', sql.Int, societe_id);
 
         await request.query(query);
-
-        console.log('Département added successfully!');
-        res.status(201).json({ message: 'Département ajouté avec succès' });
+        res.json({ message: 'departement updated successfully.' });
     } catch (err) {
-        console.error('Database Error:', err); // ✅ Debugging Log
-        res.status(500).json({ error: 'Database error', details: err.message });
+        res.status(500).json({ error: 'Failed to update departement' });
     }
 });
+
+app.post('/api/upload-organigramme-dep/:id', (req, res) => {
+    const departementId = req.params.id;
+    if (!departementId) {
+        return res.status(400).json({ message: "Departement ID is required" });
+    }
+
+    const form = new formidable.IncomingForm();
+    form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
+    form.keepExtensions = true;
+
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            console.error("Formidable error:", err);
+            return res.status(500).json({ message: 'File upload failed', error: err });
+        }
+
+        console.log("Files received:", files);
+
+        // 🔹 Fix: Correct way to get the file
+        const file = files.organigramme ? files.organigramme[0] : null;
+
+        if (!file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const originalFileName = file.originalFilename;
+        const newFileName = `${departementId}_${originalFileName}`;
+        const newPath = path.join(form.uploadDir, newFileName);
+        const dbFilePath = `/uploads/${newFileName}`;
+
+        try {
+            // Delete old file (if exists)
+            const selectQuery = `SELECT organigramme_dep FROM Departement WHERE id = @id`;
+            const request = new sql.Request();
+            request.input('id', sql.Int, departementId);
+            const result = await request.query(selectQuery);
+
+            if (result.recordset.length > 0 && result.recordset[0].organigramme_dep) {
+                const oldFilePath = path.join(__dirname, result.recordset[0].organigramme_dep);
+                if (fs.existsSync(oldFilePath)) {
+                    fs.unlinkSync(oldFilePath);
+                }
+            }
+
+            // Move the uploaded file
+            fs.rename(file.filepath, newPath, async (err) => {
+                if (err) {
+                    console.error("Error moving file:", err);
+                    return res.status(500).json({ message: 'Error moving file', error: err });
+                }
+
+                // ✅ Update database
+                const updateQuery = `UPDATE Departement SET organigramme_dep = @organigramme_dep WHERE id = @id`;
+                request.input('organigramme_dep', sql.NVarChar, dbFilePath);
+                await request.query(updateQuery);
+
+                res.status(200).json({
+                    message: 'File uploaded successfully',
+                    fileName: originalFileName,
+                    filePath: dbFilePath
+                });
+            });
+
+        } catch (dbErr) {
+            console.error("Database update error:", dbErr);
+            res.status(500).json({ message: "Database update failed", error: dbErr.message });
+        }
+    });
+});
+
+app.post('/api/departements', async (req, res) => {
+    try {
+        const { nom, societe_id } = req.body;
+
+        const query = `
+            INSERT INTO departement (nom, societe_id) 
+            OUTPUT INSERTED.id
+            VALUES (@nom, @societe_id)
+        `;
+        const request = new sql.Request();
+        request.input('nom', sql.NVarChar, nom);
+        request.input('societe_id', sql.NVarChar, societe_id);
+        const result = await request.query(query);
+
+        if (result.recordset.length > 0) {
+            res.status(201).json({ message: 'departement added successfully', data: { id: result.recordset[0].id } });
+        } else {
+            res.status(500).json({ error: 'Insertion failed' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 app.get('/api/departements/:societeId', async (req, res) => {
     try {
         const { societeId } = req.params;
