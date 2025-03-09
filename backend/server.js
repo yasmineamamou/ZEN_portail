@@ -62,7 +62,6 @@ const upload = multer({
     }
 });
 
-
 app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
     const { name, email, password, societe_id, poste_id, departement_id, status, profilePicture, role } = req.body;
     const validRoles = ['admin', 'client', 'super-admin'];
@@ -152,7 +151,6 @@ app.get('/api/users', async (req, res) => {
     }
 });
 
-// Delete User API
 app.delete('/api/users/:ids', async (req, res) => {
     try {
         const userIds = req.params.ids.split(',').map(id => parseInt(id.trim())); // Convert to an array of integers
@@ -293,8 +291,6 @@ app.put('/api/users/:id', upload.single('profilePicture'), async (req, res) => {
     }
 });
 
-
-
 app.get('/api/societes', async (req, res) => {
     try {
         const result = await sql.query('SELECT * FROM Societe');
@@ -374,7 +370,6 @@ app.post('/api/upload-organigramme/:id', (req, res) => {
     });
 });
 
-
 app.post('/api/societes', async (req, res) => {
     try {
         const { nom, description, rne, pays, adresse, Type } = req.body;
@@ -402,7 +397,6 @@ app.post('/api/societes', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
 
 app.delete('/api/societes/:id', async (req, res) => {
     try {
@@ -443,7 +437,6 @@ app.put('/api/societes/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to update Société' });
     }
 });
-
 
 app.get('/api/departements', async (req, res) => {
     try {
@@ -581,7 +574,6 @@ app.post('/api/departements', async (req, res) => {
     }
 });
 
-
 app.get('/api/departements/:societeId', async (req, res) => {
     try {
         const { societeId } = req.params;
@@ -614,8 +606,6 @@ app.get('/api/departements/:societeId', async (req, res) => {
     }
 });
 
-
-
 app.delete('/api/departements/:id', async (req, res) => {
     try {
         await sql.query`DELETE FROM Departement WHERE id = ${req.params.id}`;
@@ -635,7 +625,6 @@ app.get('/unites', async (req, res) => {
     }
 });
 
-// Get unite by ID
 app.get('/unites/:id', async (req, res) => {
     try {
         await sql.connect(dbConfig);
@@ -646,7 +635,6 @@ app.get('/unites/:id', async (req, res) => {
     }
 });
 
-// Add unite
 app.post('/unites', async (req, res) => {
     try {
         const { nom, description } = req.body;
@@ -658,7 +646,6 @@ app.post('/unites', async (req, res) => {
     }
 });
 
-// Update unite
 app.put('/unites/:id', async (req, res) => {
     try {
         const { nom, description } = req.body;
@@ -670,7 +657,6 @@ app.put('/unites/:id', async (req, res) => {
     }
 });
 
-// Delete unite
 app.delete('/unites/:id', async (req, res) => {
     try {
         await sql.connect(dbConfig);
@@ -680,7 +666,7 @@ app.delete('/unites/:id', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
-app.get('/postes', async (req, res) => {
+app.get('/api/postes', async (req, res) => {
     try {
         await sql.connect(dbConfig);
         const result = await sql.query('SELECT * FROM postes');
@@ -690,8 +676,7 @@ app.get('/postes', async (req, res) => {
     }
 });
 
-// Get poste by ID
-app.get('/postes/:id', async (req, res) => {
+app.get('/api/postes/:id', async (req, res) => {
     try {
         await sql.connect(dbConfig);
         const result = await sql.query(`SELECT * FROM postes WHERE id = ${req.params.id}`);
@@ -701,32 +686,146 @@ app.get('/postes/:id', async (req, res) => {
     }
 });
 
-// Add poste
-app.post('/postes', async (req, res) => {
+app.put('/api/postes/:id', async (req, res) => {
     try {
+        const { id } = req.params;
         const { nom, description } = req.body;
-        await sql.connect(dbConfig);
-        await sql.query(`INSERT INTO postes (nom, description) VALUES ('${nom}', '${description}')`);
-        res.status(201).json({ message: 'Poste added successfully' });
+
+        if (!id || !nom) {
+            return res.status(400).json({ error: 'ID and nom are required.' });
+        }
+
+        const query = `
+            UPDATE postes 
+            SET nom = @nom, description = @description
+            WHERE id = @id
+        `;
+        const request = new sql.Request();
+        request.input('id', sql.Int, id);
+        request.input('nom', sql.NVarChar, nom);
+        request.input('description', sql.NVarChar, description);
+
+        await request.query(query);
+        res.json({ message: 'postes updated successfully.' });
     } catch (err) {
-        res.status(500).send(err.message);
+        res.status(500).json({ error: 'Failed to update postes' });
     }
 });
 
-// Update poste
-app.put('/postes/:id', async (req, res) => {
+app.post('/api/upload-fiche-fonction/:id', (req, res) => {
+    const posteId = req.params.id;
+    if (!posteId) {
+        return res.status(400).json({ message: "poste ID is required" });
+    }
+
+    const form = new formidable.IncomingForm();
+    form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
+    form.keepExtensions = true;
+
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            console.error("Formidable error:", err);
+            return res.status(500).json({ message: 'File upload failed', error: err });
+        }
+
+        console.log("Files received:", files);
+
+        // 🔹 Fix: Correct way to get the file
+        const file = files.organigramme ? files.organigramme[0] : null;
+
+        if (!file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const originalFileName = file.originalFilename;
+        const newFileName = `${posteId}_${originalFileName}`;
+        const newPath = path.join(form.uploadDir, newFileName);
+        const dbFilePath = `/uploads/${newFileName}`;
+
+        try {
+            // Delete old file (if exists)
+            const selectQuery = `SELECT fiche_fonction FROM postes WHERE id = @id`;
+            const request = new sql.Request();
+            request.input('id', sql.Int, posteId);
+            const result = await request.query(selectQuery);
+
+            if (result.recordset.length > 0 && result.recordset[0].fiche_fonction) {
+                const oldFilePath = path.join(__dirname, result.recordset[0].fiche_fonction);
+                if (fs.existsSync(oldFilePath)) {
+                    fs.unlinkSync(oldFilePath);
+                }
+            }
+
+            // Move the uploaded file
+            fs.rename(file.filepath, newPath, async (err) => {
+                if (err) {
+                    console.error("Error moving file:", err);
+                    return res.status(500).json({ message: 'Error moving file', error: err });
+                }
+
+                const updateRequest = new sql.Request();
+                updateRequest.input('id', sql.Int, posteId);
+                updateRequest.input('fiche_fonction', sql.NVarChar, dbFilePath);
+                const updateQuery = `UPDATE Postes SET fiche_fonction = @fiche_fonction WHERE id = @id`;
+                await updateRequest.query(updateQuery);
+
+                res.status(200).json({
+                    message: 'File uploaded successfully',
+                    fileName: originalFileName,
+                    filePath: dbFilePath
+                });
+            });
+
+        } catch (dbErr) {
+            console.error("Database update error:", dbErr);
+            res.status(500).json({ message: "Database update failed", error: dbErr.message });
+        }
+    });
+});
+
+app.post('/api/postes', async (req, res) => {
     try {
         const { nom, description } = req.body;
-        await sql.connect(dbConfig);
-        await sql.query(`UPDATE postes SET nom = '${nom}', description = '${description}' WHERE id = ${req.params.id}`);
-        res.json({ message: 'Poste updated successfully' });
+
+        if (!nom) {
+            return res.status(400).json({ error: 'Nom du poste est requis' });
+        }
+
+        const query = `
+            INSERT INTO Postes (nom, description)
+            VALUES (@nom, @description);
+            
+            SELECT CAST(SCOPE_IDENTITY() AS int) AS id;
+        `;
+
+        const request = new sql.Request();
+        request.input('nom', sql.NVarChar, nom);
+        request.input('description', sql.NVarChar, description || null);
+
+        const result = await request.query(query);
+
+        console.log("Raw database query result:", result);
+
+        const insertedId = result?.recordset?.[0]?.id;
+        console.log("Extracted Inserted ID:", insertedId);
+
+        if (insertedId) {
+            console.log("Poste added successfully with ID:", insertedId);
+            res.status(201).json({
+                message: 'Poste added successfully',
+                data: { id: insertedId }
+            });
+        } else {
+            console.error("Error: No ID returned from the SQL query. Full result:", result);
+            res.status(500).json({ error: 'Insertion failed: No ID returned' });
+        }
     } catch (err) {
-        res.status(500).send(err.message);
+        console.error("Error while adding Poste:", err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Delete poste
-app.delete('/postes/:id', async (req, res) => {
+app.delete('/api/postes/:id', async (req, res) => {
     try {
         await sql.connect(dbConfig);
         await sql.query(`DELETE FROM postes WHERE id = ${req.params.id}`);
@@ -746,7 +845,6 @@ app.get('/cubes', async (req, res) => {
     }
 });
 
-// Get poste by ID
 app.get('/cubes/:id', async (req, res) => {
     try {
         await sql.connect(dbConfig);
@@ -757,7 +855,6 @@ app.get('/cubes/:id', async (req, res) => {
     }
 });
 
-// Add poste
 app.post('/cubes', async (req, res) => {
     try {
         const { nom, description } = req.body;
@@ -769,7 +866,6 @@ app.post('/cubes', async (req, res) => {
     }
 });
 
-// Update poste
 app.put('/cubes/:id', async (req, res) => {
     try {
         const { nom, description } = req.body;
@@ -781,7 +877,6 @@ app.put('/cubes/:id', async (req, res) => {
     }
 });
 
-// Delete poste
 app.delete('/cubes/:id', async (req, res) => {
     try {
         await sql.connect(dbConfig);
@@ -800,7 +895,6 @@ app.get('/api/user_unite', async (req, res) => {
     }
 });
 
-// POST a new user_unite record
 app.post('/api/user_unite', async (req, res) => {
     const { user_id, unite_id } = req.body;
     try {
@@ -811,7 +905,6 @@ app.post('/api/user_unite', async (req, res) => {
     }
 });
 
-// GET all user_cube records
 app.get('/api/user_cube', async (req, res) => {
     try {
         const result = await sql.query('SELECT * FROM user_cube');
@@ -821,7 +914,6 @@ app.get('/api/user_cube', async (req, res) => {
     }
 });
 
-// POST a new user_cube record
 app.post('/api/user_cube', async (req, res) => {
     const { user_id, cube_id } = req.body;
     try {
@@ -831,7 +923,6 @@ app.post('/api/user_cube', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
-
 
 app.get('/cubes/:id', async (req, res) => {
     try {
@@ -853,3 +944,213 @@ app.get('/cubes/:id', async (req, res) => {
     }
 });
 
+app.get('/api/module', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query('SELECT * FROM module');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/module/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        const result = await sql.query(`SELECT * FROM module WHERE id = ${req.params.id}`);
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.post('/api/module', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`INSERT INTO module (nom, description) VALUES ('${nom}', '${description}')`);
+        res.status(201).json({ message: 'module added successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.put('/api/module/:id', async (req, res) => {
+    try {
+        const { nom, description } = req.body;
+        await sql.connect(dbConfig);
+        await sql.query(`UPDATE module SET nom = '${nom}', description = '${description}' WHERE id = ${req.params.id}`);
+        res.json({ message: 'module updated successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+app.delete('/api/module/:id', async (req, res) => {
+    try {
+        await sql.connect(dbConfig);
+        await sql.query(`DELETE FROM module WHERE id = ${req.params.id}`);
+        res.json({ message: 'module deleted successfully' });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+app.get('/api/formations', async (req, res) => {
+    try {
+        const result = await sql.query('SELECT * FROM formation');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+app.post('/api/upload-formation/:id', (req, res) => {
+    const formationId = req.params.id;
+    if (!formationId) {
+        return res.status(400).json({ message: "Formation ID is required" });
+    }
+
+    const form = new formidable.IncomingForm();
+    form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
+    form.keepExtensions = true;
+
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            return res.status(500).json({ message: 'File upload failed', error: err });
+        }
+
+        console.log("Files received:", files);
+
+        const fileArray = files.file;
+        if (!fileArray || fileArray.length === 0) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const file = fileArray[0]; // Get the uploaded file
+        const originalFileName = file.originalFilename; // ✅ Keep the original name
+        const fileExtension = path.extname(originalFileName); // Extract extension
+        const newFileName = `${formationId}_${originalFileName}`; // Use original name with ID
+        const newPath = path.join(form.uploadDir, newFileName);
+        const dbFilePath = `/uploads/${newFileName}`; // Store relative path in DB
+
+        try {
+            // 🔹 Get the old file path from the database
+            const selectQuery = `SELECT piece_jointe FROM formation WHERE id = @id`;
+            const request = new sql.Request();
+            request.input('id', sql.Int, formationId);
+            const result = await request.query(selectQuery);
+
+            if (result.recordset.length > 0 && result.recordset[0].piece_jointe) {
+                const oldFilePath = path.join(__dirname, result.recordset[0].piece_jointe);
+                if (fs.existsSync(oldFilePath)) {
+                    fs.unlinkSync(oldFilePath); // Delete old file
+                }
+            }
+
+            // Move the uploaded file to the correct location
+            fs.rename(file.filepath, newPath, async (err) => {
+                if (err) {
+                    return res.status(500).json({ message: 'Error moving file', error: err });
+                }
+
+                // ✅ Update the database with the original file name
+                const updateQuery = `
+                    UPDATE formation 
+                    SET piece_jointe = @piece_jointe 
+                    WHERE id = @id
+                `;
+                request.input('piece_jointe', sql.NVarChar, dbFilePath);
+                await request.query(updateQuery);
+
+                res.status(200).json({
+                    message: 'File uploaded and path updated successfully',
+                    fileName: originalFileName, // ✅ Return the original file name
+                    filePath: dbFilePath
+                });
+            });
+
+        } catch (dbErr) {
+            res.status(500).json({ message: "Database update failed", error: dbErr.message });
+        }
+    });
+});
+
+app.post('/api/formations', async (req, res) => {
+    try {
+        const { titre, description, objectif, piece_jointe, telechargable } = req.body;
+
+        const query = `
+            INSERT INTO formation (titre, description, objectif, piece_jointe, telechargable) 
+            OUTPUT INSERTED.id
+            VALUES (@titre, @description, @objectif, @piece_jointe, @telechargable)
+        `;
+        const request = new sql.Request();
+        request.input('titre', sql.NVarChar, titre);
+        request.input('description', sql.NVarChar, description);
+        request.input('objectif', sql.NVarChar, objectif);
+        request.input('piece_jointe', sql.NVarChar, piece_jointe);
+        request.input('telechargable', sql.NVarChar, telechargable);
+        const result = await request.query(query);
+
+        if (result.recordset.length > 0) {
+            res.status(201).json({ message: 'Formation added successfully', data: { id: result.recordset[0].id } });
+        } else {
+            res.status(500).json({ error: 'Insertion failed' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/formations/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await sql.query`DELETE FROM formation WHERE id = ${id}`;
+        res.json({ message: 'formation deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/formations/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { titre, description, objectif, piece_jointe, telechargable } = req.body;
+
+        if (!id || !titre) {
+            return res.status(400).json({ error: 'ID and titre are required.' });
+        }
+
+        const query = `
+            UPDATE formation 
+            SET titre = @titre, description = @description, objectif = @objectif, piece_jointe = @piece_jointe, telechargable = @telechargable
+            WHERE id = @id
+        `;
+        const request = new sql.Request();
+        request.input('id', sql.Int, id);
+        request.input('titre', sql.NVarChar, titre);
+        request.input('description', sql.NVarChar, description);
+        request.input('objectif', sql.NVarChar, objectif);
+        request.input('piece_jointe', sql.NVarChar, piece_jointe);
+        request.input('telechargable', sql.NVarChar, telechargable);
+
+        await request.query(query);
+        res.json({ message: 'formation updated successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to update formation' });
+    }
+});
+app.get('/api/formations/grouped-by-module', async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT m.nom as moduleName, 
+                   JSON_ARRAYAGG(JSON_OBJECT('id', f.id, 'titre', f.titre, 'date', f.date, 'auteur', 'Lorem Ipsum')) as formations
+            FROM formation f
+            JOIN formation_module fm ON f.id = fm.formation_id
+            JOIN module m ON fm.module_id = m.id
+            GROUP BY m.nom
+        `);
+        res.json(result);
+    } catch (error) {
+        res.status(500).send(error.message);
+    }
+});

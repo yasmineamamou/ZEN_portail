@@ -43,7 +43,7 @@ import { DepartementService } from '../../services/departement.service';
   styleUrl: './gestion-dep.component.css'
 })
 export class GestionDepComponent implements OnInit {
-  displayedColumns: string[] = ['name', 'societe'];
+  displayedColumns: string[] = ['name', 'societe', 'organigramme'];
   dataSource = new MatTableDataSource<any>([]);
   societes: any[] = [];
   showAddDepartementForm = false;

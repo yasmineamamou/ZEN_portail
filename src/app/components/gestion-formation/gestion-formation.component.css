@@ -1,0 +1,63 @@
+.gestion-formations-container {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+}
+
+.add-formation-btn {
+    background-color: #1b9c98;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.filter {
+    min-width: 150px;
+    border: 2px solid #1b9c98;
+    border-radius: 4px;
+    font-size: 16px;
+    padding: 10px;
+    color: #1b9c98;
+    background-color: #D8EAD3;
+    flex-shrink: 0;
+}
+
+.search-input {
+    margin-left: 170px;
+    width: 60%;
+    box-sizing: border-box;
+    border: 2px solid #1b9c98;
+    border-radius: 4px;
+    font-size: 16px;
+    padding: 12px 20px 12px 40px;
+    background-color: white;
+    background-image: url('https://cdn-icons-png.flaticon.com/512/622/622669.png');
+    background-position: 10px 10px;
+    background-repeat: no-repeat;
+    background-size: 20px 20px;
+    /* Adjust icon size */
+}
+
+.search-input::placeholder {
+    color: #1b9c98;
+    opacity: 1;
+}
+
+.search-container {
+    flex: 1;
+    /* Makes the search input take up the remaining space */
+    position: relative;
+}

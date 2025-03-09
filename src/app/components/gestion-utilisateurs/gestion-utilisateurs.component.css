@@ -3,7 +3,7 @@
 }
 
 .add-user-btn {
-    background-color: #008080;
+    background-color: #1b9c98;
     color: white;
     padding: 10px 15px;
     border: none;
@@ -169,12 +169,7 @@ button {
 
 .profile-picture:hover {
     opacity: 0.7;
-    /* ✅ Slight transparency on hover to indicate interactivity */
 }
-
-/* ✅ Prevents clicking inside the form from closing it */
-
-
 
 .close-button {
     position: absolute;

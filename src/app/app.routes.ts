@@ -7,6 +7,9 @@ import { GestionDepComponent } from './components/gestion-dep/gestion-dep.compon
 import { GestionUnitesComponent } from './components/gestion-unites/gestion-unites.component';
 import { GestionPostesComponent } from './components/gestion-postes/gestion-postes.component';
 import { GestionCubesComponent } from './components/gestion-cubes/gestion-cubes.component';
+import { ModuleComponent } from './components/module/module.component';
+import { FormationComponent } from './components/formation/formation.component';
+import { GestionFormationComponent } from './components/gestion-formation/gestion-formation.component';
 
 export const routes: Routes = [
     { path: '', component: DashboardComponent },
@@ -17,4 +20,7 @@ export const routes: Routes = [
     { path: 'gestion-unites', component: GestionUnitesComponent },
     { path: 'gestion-postes', component: GestionPostesComponent },
     { path: 'gestion-cubes', component: GestionCubesComponent },
+    { path: 'module', component: ModuleComponent },
+    { path: 'formation', component: FormationComponent },
+    { path: 'gestion-formation', component: GestionFormationComponent },
 ];

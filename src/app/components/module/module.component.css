@@ -1,19 +1,20 @@
-.gestion-postes-container {
+.gestion-modules-container {
     padding: 20px;
 }
 
-.add-poste-btn,
+.add-module-btn,
 .submit-button {
     background-color: #1B9C98 !important;
     color: white;
     padding: 10px 15px;
     border: none;
     border-radius: 5px;
+    font-weight: bold;
     margin-bottom: 20px;
     cursor: pointer;
 }
 
-.add-poste-btn:hover {
+.add-module-btn:hover {
     background-color: #64bebc !important;
     color: black !important;
     transition: background-color 0.3s ease;
@@ -29,7 +30,7 @@
 }
 
 textarea {
-    height: 170px;
+    height: 200px;
 }
 
 /* ✅ Overlay background */
@@ -118,14 +119,16 @@ mat-form-field {
 /* ✅ Buttons in Description Column */
 .actions-container {
     display: flex;
+    gap: 10px;
 }
+
 
 h2 {
     text-align: left;
 }
 
 /* ✅ Style the form container (centering and width control) */
-.poste-form {
+.module-form {
     background: white;
     padding: 30px;
     border-radius: 10px;
@@ -144,6 +147,7 @@ h2 {
     justify-content: center;
     align-items: center;
     width: 100%;
+    gap: 15px;
 }
 
 /* ✅ Proper spacing for form grid */
@@ -151,6 +155,7 @@ h2 {
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
+    gap: 20px;
 }
 
 /* ✅ Centering labels and inputs */
@@ -168,6 +173,8 @@ h2 {
     width: 37%;
     margin-right: 30px;
 }
+
+
 
 .submit-button:hover {
     background-color: #64bebc !important;

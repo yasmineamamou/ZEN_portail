@@ -47,7 +47,7 @@ import { SocieteService } from '../../services/societe.service';
   styleUrl: './gestion-societes.component.css'
 })
 export class GestionSocietesComponent implements OnInit {
-  displayedColumns: string[] = ['name', 'description', 'rne', 'pays', 'adresse', 'Type', 'actions'];
+  displayedColumns: string[] = ['name', 'description', 'rne', 'pays', 'adresse', 'Type', 'organigramme', 'actions'];
   imagePreview: string | null = null;
   dataSource = new MatTableDataSource<any>([]);
   showAddSocieteForm = false;
@@ -61,8 +61,6 @@ export class GestionSocietesComponent implements OnInit {
   shortLink: string = "";
   loading: boolean = false; // Flag variable
   file: File | null = null; // ✅ Allow both File and null
-
-
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -78,9 +76,6 @@ export class GestionSocietesComponent implements OnInit {
       this.file = inputElement.files[0]; // ✅ Now TypeScript recognizes `files`
     }
   }
-
-
-
 
   loadSocietes() {
     this.societeService.getSocietes().subscribe(data => {

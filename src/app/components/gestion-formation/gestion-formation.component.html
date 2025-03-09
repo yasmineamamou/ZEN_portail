@@ -1,0 +1,34 @@
+<div class="gestion-formations-container">
+    <div class="actions">
+        <!-- Add Formation Button -->
+        <button class="add-formation-btn">
+            + AJOUTER FORMATION
+        </button>
+
+        <!-- Search Bar with Icon Inside the Input -->
+        <div class="search-container">
+            <input type="text" placeholder="Rechercher.." name="search" [(ngModel)]="searchTerm"
+                (input)="onSearchChange()" class="search-input" />
+        </div>
+
+        <!-- Module Filter Dropdown -->
+        <select [(ngModel)]="selectedModule" (change)="onModuleFilterChange()" class="filter">
+            <option value="">Filtrer par module</option>
+            <option *ngFor="let group of moduleGroups" [value]="group.moduleName">
+                {{ group.moduleName }}
+            </option>
+        </select>
+    </div>
+    <div *ngFor="let group of moduleGroups" class="module-group">
+        <h2>{{ group.moduleName.toUpperCase() }}:</h2>
+        <div class="formation-list">
+            <div class="formation-card" *ngFor="let formation of group.formations">
+                <div class="card-content">
+                    <h3>{{ formation.titre }}</h3>
+                    <p>Date: {{ formation.date }}</p>
+                    <p>Par: {{ formation.auteur }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

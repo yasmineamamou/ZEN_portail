@@ -1,51 +1,23 @@
-<div class="gestion-unites-container">
-    <!-- Actions (Add Unité Button) -->
+<div class="gestion-modules-container">
+    <!-- Actions (Add module Button) -->
     <div class="actions">
-        <button class="add-unite-btn" (click)="openAddUniteForm()">+ AJOUTER UNITE</button>
+        <button class="add-module-btn" (click)="openAddModuleForm()">+ AJOUTER MODULE</button>
     </div>
 
-    <!-- Add Unité Modal -->
-    <div *ngIf="showAddUniteForm" class="full-page-overlay" (click)="closeAddUniteForm()">
-        <div class="unite-form" (click)="$event.stopPropagation()">
-            <h2 class="form-title">Gestion Des Unités: </h2>
-            <form #addUniteForm="ngForm" (ngSubmit)="onAddUnite()" novalidate>
+    <!-- Add Module Modal -->
+    <div *ngIf="showAddModuleForm" class="full-page-overlay" (click)="closeAddModuleForm()">
+        <div class="module-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Gestion Des Modules: </h2>
+            <form #addModuleForm="ngForm" (ngSubmit)="onAddModule()" novalidate>
                 <div class="form-container">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label class="custom-label">NOM DE L'UNITE: *</label>
-                            <input type="text" [(ngModel)]="newUnite.nom" name="nom" required class="custom-input">
+                            <label class="custom-label">NOM DE MODULE: *</label>
+                            <input type="text" [(ngModel)]="newModule.nom" name="nom" required class="custom-input">
                         </div>
                         <div class="form-group">
                             <label class="custom-label">DESCRIPTION:</label>
-                            <textarea [(ngModel)]="newUnite.description" name="description"
-                                class="custom-input"></textarea>
-                        </div>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <div class="submit-section">
-                        <button mat-raised-button class="submit-button" type="submit" [disabled]="addUniteForm.invalid">
-                            AJOUTER
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-    <!-- Edit Unité Modal -->
-    <div *ngIf="showEditUniteForm" class="full-page-overlay" (click)="closeEditUniteForm()">
-        <div class="unite-form" (click)="$event.stopPropagation()">
-            <h2 class="form-title">Modifier Unité:</h2>
-            <form #editUniteForm="ngForm" (ngSubmit)="onEditUnite()" novalidate>
-                <div class="form-container">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label class="custom-label">NOM DE UNITE: *</label>
-                            <input type="text" [(ngModel)]="selectedUnite.nom" name="nom" required class="custom-input">
-                        </div>
-                        <div class="form-group">
-                            <label class="custom-label">DESCRIPTION:</label>
-                            <textarea [(ngModel)]="selectedUnite.description" name="description"
+                            <textarea [(ngModel)]="newModule.description" name="description"
                                 class="custom-input"></textarea>
                         </div>
                     </div>
@@ -53,7 +25,37 @@
                     <!-- Submit Button -->
                     <div class="submit-section">
                         <button mat-raised-button class="submit-button" type="submit"
-                            [disabled]="editUniteForm.invalid">
+                            [disabled]="addModuleForm.invalid">
+                            AJOUTER
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Edit Module Modal -->
+    <div *ngIf="showEditModuleForm" class="full-page-overlay" (click)="closeEditModuleForm()">
+        <div class="module-form" (click)="$event.stopPropagation()">
+            <h2 class="form-title">Modifier Unité:</h2>
+            <form #editModuleForm="ngForm" (ngSubmit)="onEditModule()" novalidate>
+                <div class="form-container">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="custom-label">NOM DE MODULE: *</label>
+                            <input type="text" [(ngModel)]="selectedModule.nom" name="nom" required
+                                class="custom-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="custom-label">DESCRIPTION:</label>
+                            <textarea [(ngModel)]="selectedModule.description" name="description"
+                                class="custom-input"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="submit-section">
+                        <button mat-raised-button class="submit-button" type="submit"
+                            [disabled]="editModuleForm.invalid">
                             MODIFIER
                         </button>
                     </div>
@@ -63,20 +65,20 @@
     </div>
     <!-- Table for Unités -->
     <table mat-table [dataSource]="dataSource" matSort class="mat-elevation-z8">
-        <ng-container matColumnDef="name">
+        <ng-container matColumnDef="nom">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Nom</th>
-            <td mat-cell *matCellDef="let unite"> {{ unite.nom }}</td>
+            <td mat-cell *matCellDef="let module"> {{ module.nom }}</td>
         </ng-container>
 
         <ng-container matColumnDef="description">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
-            <td mat-cell *matCellDef="let unite" class="description-column">
-                <span>{{ unite.description }}</span>
+            <td mat-cell *matCellDef="let module" class="description-column">
+                <span>{{ module.description }}</span>
                 <span class="actions-container">
-                    <button mat-icon-button color="primary" (click)="openEditUniteForm(unite)">
+                    <button mat-icon-button color="primary" (click)="openEditModuleForm(module)">
                         <mat-icon>edit</mat-icon>
                     </button>
-                    <button mat-icon-button color="warn" (click)="deleteUnite(unite.id)">
+                    <button mat-icon-button color="warn" (click)="deleteModule(module.id)">
                         <mat-icon>delete</mat-icon>
                     </button>
                 </span>

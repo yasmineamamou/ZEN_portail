@@ -50,6 +50,10 @@ export class GestionPostesComponent {
   newPoste = { nom: '', description: '' };
   selectedPoste: any = { id: null, nom: '', description: '' };
 
+  shortLink: string = "";
+  loading: boolean = false; // Flag variable
+  file: File | null = null; // ✅ Allow both File and null
+
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
@@ -67,6 +71,21 @@ export class GestionPostesComponent {
       this.dataSource.sort = this.sort;
     });
   }
+  onChange(event: Event) {
+    const inputElement = event.target as HTMLInputElement; // ✅ Type assertion
+    if (inputElement.files && inputElement.files.length > 0) {
+      this.file = inputElement.files[0]; // ✅ Now TypeScript recognizes `files`
+    }
+  }
+
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.file = file;
+      console.log("Selected file:", file.name); // ✅ Debugging log
+    }
+  }
+
   openAddPosteForm() {
     this.showAddPosteForm = true;
     this.newPoste = { nom: '', description: '' };
@@ -91,39 +110,65 @@ export class GestionPostesComponent {
   closeEditPosteForm() {
     this.showEditPosteForm = false;
   }
-
   onAddPoste() {
-    if (!this.newPoste.nom.trim()) {
-      alert('Le nom de la poste est requis.');
-      return;
-    }
+    this.posteService.addPoste(this.newPoste).subscribe(
+      (res: any) => {
+        console.log("Full server response:", res);
 
-    this.posteService.addPoste(this.newPoste).subscribe(() => {
+        if (res?.data?.id) {
+          const posteId = res.data.id;
+          console.log("Successfully added poste with ID:", posteId);
+
+          // Display or use the ID as needed
+          alert(`Poste added successfully with ID: ${posteId}`);
+
+          if (this.file) {
+            this.posteService.uploadFicheFonction(this.file, posteId).subscribe(
+              (event: any) => {
+                console.log("File uploaded successfully:", event.fileName);
+                this.loading = false;
+              },
+              (error) => {
+                console.error("Upload failed:", error);
+                this.loading = false;
+              }
+            );
+          }
+        } else {
+          console.error("Error: No ID returned from the server", res);
+        }
+
+        this.loadPostes();
+        this.showAddPosteForm = false;
+      },
+      (error) => {
+        console.error("Poste creation failed:", error);
+      }
+    );
+  }
+  onEditPoste() {
+    this.posteService.updatePoste(this.selectedPoste.id, this.selectedPoste).subscribe(res => {
+      console.log("departement updated successfully:", res);
+
+      if (this.file) {  // If user uploaded a new file
+        this.posteService.updateOrganigramme(this.file, this.selectedPoste.id).subscribe(
+          (event: any) => {
+            if (event.fileName) { // ✅ Display original file name
+              console.log("File updated successfully:", event.fileName);
+            }
+            this.loading = false;
+          },
+          (error) => {
+            console.error("File update failed:", error);
+            this.loading = false;
+          }
+        );
+      }
       this.loadPostes();
-      this.showAddPosteForm = false;
+      this.showEditPosteForm = false;
     });
   }
 
-  onEditPoste() {
-    if (!this.selectedPoste.nom.trim()) {
-      alert('Le nom de la poste est requis.');
-      return;
-    }
-
-    console.log('Updating Poste:', this.selectedPoste); // ✅ Debugging Log
-
-    this.posteService.updatePoste(this.selectedPoste.id, this.selectedPoste)
-      .subscribe(
-        response => {
-          console.log('Poste Updated Successfully:', response); // ✅ Success Log
-          this.loadPostes();
-          this.showEditPosteForm = false;
-        },
-        error => {
-          console.error('Edit Error:', error); // ✅ Log error response
-        }
-      );
-  }
   deletePoste(id: number) {
     if (confirm('Êtes-vous sûr de vouloir supprimer cette poste ?')) {
       this.posteService.deletePoste(id).subscribe(() => this.loadPostes());

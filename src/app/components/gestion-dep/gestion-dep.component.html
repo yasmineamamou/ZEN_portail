@@ -99,8 +99,18 @@
             <td mat-cell *matCellDef="let departement"> {{ departement.nom }}</td>
         </ng-container>
 
+        <ng-container matColumnDef="organigramme">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Organigramme</th>
+            <td mat-cell *matCellDef="let departement">
+                <a *ngIf="departement.organigramme_dep" [href]="departement.organigramme_dep" target="_blank" download>
+                    Voir Organigramme
+                </a>
+                <span *ngIf="!departement.organigramme_dep">Aucun fichier</span>
+            </td>
+        </ng-container>
+
         <ng-container matColumnDef="societe">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Société</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Société associée</th>
             <td mat-cell *matCellDef="let departement" class="societe-column">
                 <span>{{ departement.societe }}</span>
                 <span class="actions-container">
