@@ -7,11 +7,19 @@ const path = require('path'); // ✅ Add this line
 const port = 3000; // ✅ Define the port number
 const fs = require('fs');
 const app = express();
+const http = require('http');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const bodyParser = require('body-parser');
+const bcrypt = require('bcryptjs');
+
 var formidable = require('formidable');
 const router = express.Router(); // ✅ Define router before using it
 app.use(cors());
-app.use(express.json()); // Enable JSON body parsing 
-app.use(express.urlencoded({ extended: true })); // Middleware for form data
+
+app.use(bodyParser.json());
+const JWT_SECRET = 'your_jwt_secret_key_here'; // Keep this secret and safe
+// app.use(express.urlencoded({ extended: true })); // Middleware for form data
 app.use('/uploads', express.static('uploads'));
 // Ensure "uploads/" directory exists
 const uploadDir = path.join(__dirname, 'uploads');
@@ -19,15 +27,15 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 
-
 // ✅ Define dbConfig properly
 const dbConfig = {
     user: process.env.DB_USER || 'my_db_user',
     password: process.env.DB_PASSWORD || 'yasmineamamou',
     server: process.env.DB_SERVER || 'localhost',
-    database: process.env.DB_NAME || 'zen_portail',
+    database: process.env.DB_NAME || 'zen_portail1',
     options: {
         encrypt: true,
+        enableArithAbort: true,
         trustServerCertificate: true
     },
     port: 1433 // Ensure SQL Server is running on this port
@@ -36,9 +44,6 @@ sql.connect(dbConfig)
     .then(() => console.log('Connected to SQL Server'))
     .catch(err => console.error('Database connection failed', err));
 
-
-
-// ✅ Set up Multer storage configuration
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, 'uploads/'); // Save files in 'uploads' folder
@@ -62,42 +67,149 @@ const upload = multer({
     }
 });
 
-app.post('/api/users', upload.single('profilePicture'), async (req, res) => {
-    const { name, email, password, societe_id, poste_id, departement_id, status, profilePicture, role } = req.body;
-    const validRoles = ['admin', 'client', 'super-admin'];
-    if (!validRoles.includes(role)) {
-        return res.status(400).json({ message: 'Invalid role. Allowed values: admin, client, super-admin' });
-    }
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
 
     try {
-        let pool = await sql.connect(dbConfig);
-        const statusBit = status === 1 ? 1 : 0;
-        let userResult = await pool.request()
-            .input('name', sql.NVarChar, name)
-            .input('email', sql.NVarChar, email)
-            .input('password', sql.NVarChar, password)
-            .input('societe_id', sql.Int, societe_id)
-            .input('poste_id', sql.Int, poste_id)
-            .input('departement_id', sql.Int, departement_id)
-            .input('status', sql.Bit, statusBit) // Use BIT instead of NVARCHAR
-            .input('profilePicture', sql.NVarChar, profilePicture)
-            .input('date_creation', sql.DateTime, new Date())
+        const result = await sql.query`SELECT * FROM users WHERE email = ${email}`;
+        const user = result.recordset[0];
 
-            .input('role', sql.NVarChar, role)
-            .query(`
-                INSERT INTO Users (name, email, password, societe_id, poste_id, departement_id, status, date_creation, profilePicture,role)
-                OUTPUT INSERTED.id
-                VALUES (@name, @email, @password, @societe_id, @poste_id, @departement_id, @status, @date_creation, @profilePicture, @role)
-            `);
+        if (!user) return res.status(401).json({ message: 'Invalid email or password' });
 
-        let newUserId = userResult.recordset[0].id;
-        res.status(201).json({ message: 'User created successfully', userId: newUserId });
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) return res.status(401).json({ message: 'Invalid email or password' });
 
-    } catch (error) {
-        console.error('Error inserting user:', error.message);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
     }
 });
+
+app.post('/api/upload-photo/:id', (req, res) => {
+    const userId = req.params.id;
+    if (!userId) {
+        return res.status(400).json({ message: "userId ID is required" });
+    }
+
+    const form = new formidable.IncomingForm();
+    form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
+    form.keepExtensions = true;
+
+    form.parse(req, async (err, fields, files) => {
+        if (err) {
+            return res.status(500).json({ message: 'File upload failed', error: err });
+        }
+
+        console.log("Files received:", files);
+
+        const fileArray = files.file;
+        if (!fileArray || fileArray.length === 0) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const file = fileArray[0]; // Get the uploaded file
+        const originalFileName = file.originalFilename; // ✅ Keep the original name
+        const fileExtension = path.extname(originalFileName); // Extract extension
+        const newFileName = `${userId}_${originalFileName}`; // Use original name with ID
+        const newPath = path.join(form.uploadDir, newFileName);
+        const dbFilePath = `/uploads/${newFileName}`; // Store relative path in DB
+
+        try {
+            // 🔹 Get the old file path from the database
+            const selectQuery = `SELECT profilePicture FROM Users WHERE id = @id`;
+            const request = new sql.Request();
+            request.input('id', sql.Int, userId);
+            const result = await request.query(selectQuery);
+
+            if (result.recordset.length > 0 && result.recordset[0].profilePicture) {
+                const oldFilePath = path.join(__dirname, result.recordset[0].profilePicture);
+                if (fs.existsSync(oldFilePath)) {
+                    fs.unlinkSync(oldFilePath); // Delete old file
+                }
+            }
+
+            // Move the uploaded file to the correct location
+            fs.rename(file.filepath, newPath, async (err) => {
+                if (err) {
+                    return res.status(500).json({ message: 'Error moving file', error: err });
+                }
+
+                // ✅ Update the database with the original file name
+                const updateQuery = `
+                    UPDATE Users 
+                    SET profilePicture = @profilePicture 
+                    WHERE id = @id
+                `;
+                request.input('profilePicture', sql.NVarChar, dbFilePath);
+                await request.query(updateQuery);
+
+                res.status(200).json({
+                    message: 'File uploaded and path updated successfully',
+                    fileName: originalFileName, // ✅ Return the original file name
+                    filePath: dbFilePath
+                });
+            });
+
+        } catch (dbErr) {
+            res.status(500).json({ message: "Database update failed", error: dbErr.message });
+        }
+    });
+});
+
+app.post('/api/users', async (req, res) => {
+    try {
+        const {
+            name,
+            email,
+            password,
+            societe_id,
+            poste_id,
+            departement_id,
+            status,
+            role
+        } = req.body;
+
+        const validRoles = ['admin', 'client', 'super-admin'];
+        if (!validRoles.includes(role)) {
+            return res.status(400).json({ message: 'Invalid role' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash the password
+        const statusBit = status === 1 ? 1 : 0;
+
+        const request = new sql.Request();
+        request.input('name', sql.NVarChar, name);
+        request.input('email', sql.NVarChar, email);
+        request.input('password', sql.NVarChar, hashedPassword); // ✅ Store hashed
+        request.input('societe_id', sql.Int, societe_id);
+        request.input('poste_id', sql.Int, poste_id);
+        request.input('departement_id', sql.Int, departement_id);
+        request.input('status', sql.Bit, statusBit);
+        request.input('role', sql.NVarChar, role);
+        request.input('date_creation', sql.DateTime, new Date());
+
+        const query = `
+            INSERT INTO Users (name, email, password, societe_id, poste_id, departement_id, status, date_creation, role)
+            OUTPUT INSERTED.id
+            VALUES (@name, @email, @password, @societe_id, @poste_id, @departement_id, @status, @date_creation, @role)
+        `;
+
+        const result = await request.query(query);
+
+        if (result.recordset.length > 0) {
+            res.status(201).json({ message: 'User created', userId: result.recordset[0].id });
+        } else {
+            res.status(500).json({ message: 'Insert failed' });
+        }
+
+    } catch (err) {
+        console.error('Create user error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/user_unite', async (req, res) => {
     const { user_id, unite_id } = req.body;
 
@@ -132,19 +244,30 @@ app.post('/api/user_cube', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
-
 app.get('/api/users', async (req, res) => {
     try {
-        const result = await sql.query('SELECT users.id, users.name, users.email, users.password,users.date_creation ,users.profilePicture,users.role,users.status, Departement.nom AS departement,postes.nom AS postes  ,Societe.nom AS societe FROM Users JOIN Departement ON Users.departement_id = Departement.id JOIN Societe ON Users.societe_id = Societe.id JOIN postes ON Users.poste_id = postes.id ');
+        const pool = await sql.connect(dbConfig);
 
-        // ✅ Fix image URLs before sending response
-        const users = result.recordset.map(user => ({
-            ...user,
-            profilePicture: user.profilePicture
-                ? `http://localhost:3000${user.profilePicture}`  // ✅ Ensure full image URL
-                : null  // No image uploaded
-        }));
-        res.json(users);
+        // Step 1: Get all users
+        const result = await pool.request().query(`
+            SELECT
+                users.id,
+                users.name,
+                users.email,
+                users.password,
+                users.date_creation, 
+                users.role,
+                users.status,
+                Departement.nom AS departement,
+                Postes.nom AS postes,
+                Societe.nom AS societe
+            FROM users
+            LEFT JOIN Departement ON users.departement_id = Departement.id
+            LEFT JOIN Postes ON users.poste_id = Postes.id
+            LEFT JOIN Societe ON users.societe_id = Societe.id
+        `);
+        console.log('Users Data:', result.recordset); // ✅ Debugging Log
+        res.json(result.recordset);
     } catch (err) {
         console.error('Database Error:', err); // ✅ Log error to console
         res.status(500).json({ error: 'Database error', details: err.message });
@@ -216,13 +339,12 @@ app.get('/api/users/:id', async (req, res) => {
     }
 });
 
-app.put('/api/users/:id', upload.single('profilePicture'), async (req, res) => {
+app.put('/api/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
         console.log("Received Update Request for User ID:", id);
         console.log("Request Body:", req.body);
-
-        const { name, email, password, societe_id, poste_id, departement_id, status, profilePicture, role, unite_ids, menu_cube_ids } = req.body;
+        const { name, email, password, societe_id, poste_id, departement_id, status, role, unite_ids, menu_cube_ids } = req.body;
 
         const validRoles = ['admin', 'client', 'super-admin'];
         if (!validRoles.includes(role)) {
@@ -231,6 +353,7 @@ app.put('/api/users/:id', upload.single('profilePicture'), async (req, res) => {
 
         let pool = await sql.connect(dbConfig);
 
+        const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash the password
         const statusBit = status ? 1 : 0;
 
         // 🔹 **1. Update Users Table**
@@ -238,18 +361,17 @@ app.put('/api/users/:id', upload.single('profilePicture'), async (req, res) => {
             .input('id', sql.Int, id)
             .input('name', sql.NVarChar, name)
             .input('email', sql.NVarChar, email)
-            .input('password', sql.NVarChar, password)
+            .input('password', sql.NVarChar, hashedPassword) // ✅ Store hashed
             .input('societe_id', sql.Int, societe_id)
             .input('poste_id', sql.Int, poste_id)
             .input('departement_id', sql.Int, departement_id)
             .input('status', sql.Bit, statusBit)
-            .input('profilePicture', sql.NVarChar, profilePicture)
             .input('role', sql.NVarChar, role)
             .query(`
                 UPDATE Users 
                 SET name = @name, email = @email, password = @password, societe_id = @societe_id, 
                     poste_id = @poste_id, departement_id = @departement_id, 
-                    status = @status, profilePicture = @profilePicture, role = @role
+                    status = @status, role = @role
                 WHERE id = @id
             `);
 
@@ -1005,101 +1127,124 @@ app.get('/api/formations', async (req, res) => {
 });
 app.post('/api/upload-formation/:id', (req, res) => {
     const formationId = req.params.id;
+
     if (!formationId) {
         return res.status(400).json({ message: "Formation ID is required" });
     }
 
     const form = new formidable.IncomingForm();
-    form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir);
+    }
+
+    form.uploadDir = uploadDir;
     form.keepExtensions = true;
 
     form.parse(req, async (err, fields, files) => {
         if (err) {
+            console.error("Formidable error:", err);
             return res.status(500).json({ message: 'File upload failed', error: err });
         }
 
         console.log("Files received:", files);
 
-        const fileArray = files.file;
-        if (!fileArray || fileArray.length === 0) {
+        // ✅ Correction ici
+        const file = files.organigramme ? files.organigramme[0] : null;
+
+        if (!file) {
             return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const file = fileArray[0]; // Get the uploaded file
-        const originalFileName = file.originalFilename; // ✅ Keep the original name
-        const fileExtension = path.extname(originalFileName); // Extract extension
-        const newFileName = `${formationId}_${originalFileName}`; // Use original name with ID
-        const newPath = path.join(form.uploadDir, newFileName);
-        const dbFilePath = `/uploads/${newFileName}`; // Store relative path in DB
-
-        try {
-            // 🔹 Get the old file path from the database
-            const selectQuery = `SELECT piece_jointe FROM formation WHERE id = @id`;
-            const request = new sql.Request();
-            request.input('id', sql.Int, formationId);
-            const result = await request.query(selectQuery);
-
-            if (result.recordset.length > 0 && result.recordset[0].piece_jointe) {
-                const oldFilePath = path.join(__dirname, result.recordset[0].piece_jointe);
-                if (fs.existsSync(oldFilePath)) {
-                    fs.unlinkSync(oldFilePath); // Delete old file
-                }
+        const originalFileName = file.originalFilename;
+        const newFileName = `${formationId}_${originalFileName}`;
+        const newPath = path.join(uploadDir, newFileName);
+        const dbFilePath = `/uploads/${newFileName}`;
+        fs.rename(file.filepath, newPath, async (err) => {
+            if (err) {
+                return res.status(500).json({ message: 'Error moving file', error: err });
             }
 
-            // Move the uploaded file to the correct location
-            fs.rename(file.filepath, newPath, async (err) => {
-                if (err) {
-                    return res.status(500).json({ message: 'Error moving file', error: err });
-                }
+            try {
+                const pool = await sql.connect(dbConfig);
 
-                // ✅ Update the database with the original file name
-                const updateQuery = `
-                    UPDATE formation 
-                    SET piece_jointe = @piece_jointe 
-                    WHERE id = @id
-                `;
-                request.input('piece_jointe', sql.NVarChar, dbFilePath);
-                await request.query(updateQuery);
+                // ✅ Recrée une nouvelle requête SQL
+                const updateReq = pool.request(); //
+                updateReq.input('id', sql.Int, formationId);
+                updateReq.input('piece_jointe', sql.NVarChar, dbFilePath);
+
+                await updateReq.query(`
+                UPDATE formation 
+                SET piece_jointe = @piece_jointe 
+                WHERE id = @id
+              `);
 
                 res.status(200).json({
                     message: 'File uploaded and path updated successfully',
-                    fileName: originalFileName, // ✅ Return the original file name
-                    filePath: dbFilePath
+                    filePath: dbFilePath,
+                    fileName: originalFileName
                 });
-            });
 
-        } catch (dbErr) {
-            res.status(500).json({ message: "Database update failed", error: dbErr.message });
-        }
+            } catch (updateErr) {
+                console.error("❌ DB Update error:", updateErr);
+                res.status(500).json({ message: "Failed to update database", error: updateErr.message });
+            }
+        });
+
     });
 });
 
+
 app.post('/api/formations', async (req, res) => {
     try {
-        const { titre, description, objectif, piece_jointe, telechargable } = req.body;
+        const { titre, description, objectif, piece_jointe, telechargable, modules } = req.body;
 
-        const query = `
+        console.log("📦 Received formation data:", req.body);
+
+        const pool = await sql.connect(dbConfig);
+        const request = pool.request();
+
+        // Insert formation
+        request.input('titre', sql.NVarChar, titre);
+        request.input('description', sql.NVarChar, description);
+        request.input('objectif', sql.NVarChar, objectif);
+        request.input('piece_jointe', sql.NVarChar, piece_jointe || '');
+        request.input('telechargable', sql.NVarChar, String(telechargable));
+
+        const insertQuery = `
             INSERT INTO formation (titre, description, objectif, piece_jointe, telechargable) 
             OUTPUT INSERTED.id
             VALUES (@titre, @description, @objectif, @piece_jointe, @telechargable)
         `;
-        const request = new sql.Request();
-        request.input('titre', sql.NVarChar, titre);
-        request.input('description', sql.NVarChar, description);
-        request.input('objectif', sql.NVarChar, objectif);
-        request.input('piece_jointe', sql.NVarChar, piece_jointe);
-        request.input('telechargable', sql.NVarChar, telechargable);
-        const result = await request.query(query);
 
-        if (result.recordset.length > 0) {
-            res.status(201).json({ message: 'Formation added successfully', data: { id: result.recordset[0].id } });
-        } else {
-            res.status(500).json({ error: 'Insertion failed' });
+        const result = await request.query(insertQuery);
+        const formationId = result.recordset[0].id;
+
+        // Insert into formation_module
+        if (modules && modules.length > 0) {
+            for (const moduleId of modules) {
+                await pool.request()
+                    .input('formation_id', sql.Int, formationId)
+                    .input('module_id', sql.Int, moduleId)
+                    .query(`
+                        INSERT INTO formation_module (formation_id, module_id)
+                        VALUES (@formation_id, @module_id)
+                    `);
+            }
         }
+
+        res.status(201).json({
+            message: 'Formation added successfully',
+            data: { id: formationId }
+        });
+
+        await pool.close();
     } catch (err) {
+        console.error("🔥 Error in POST /api/formations:", err);
         res.status(500).json({ error: err.message });
     }
 });
+
 
 app.delete('/api/formations/:id', async (req, res) => {
     try {
@@ -1139,18 +1284,85 @@ app.put('/api/formations/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to update formation' });
     }
 });
-app.get('/api/formations/grouped-by-module', async (req, res) => {
+const { poolPromise } = require('./db');
+
+
+app.get('/api/formation_module', async (req, res) => {
     try {
-        const result = await db.query(`
-            SELECT m.nom as moduleName, 
-                   JSON_ARRAYAGG(JSON_OBJECT('id', f.id, 'titre', f.titre, 'date', f.date, 'auteur', 'Lorem Ipsum')) as formations
-            FROM formation f
-            JOIN formation_module fm ON f.id = fm.formation_id
-            JOIN module m ON fm.module_id = m.id
-            GROUP BY m.nom
-        `);
-        res.json(result);
-    } catch (error) {
-        res.status(500).send(error.message);
+        const result = await sql.query('SELECT * FROM formation_module');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
     }
 });
+
+app.post('/api/formation_module', async (req, res) => {
+    const { formation_id, module_id } = req.body;
+
+    if (!formation_id || !module_id) {
+        return res.status(400).json({ message: "formation_id et module_id sont requis" });
+    }
+
+    try {
+        const request = new sql.Request();
+        request.input('formation_id', sql.Int, formation_id);
+        request.input('module_id', sql.Int, module_id);
+
+        await request.query(`
+        INSERT INTO dbo.formation_module (formation_id, module_id)
+        VALUES (@formation_id, @module_id)
+      `);
+
+        res.status(201).json({ message: 'Lien formation-module ajouté avec succès' });
+    } catch (err) {
+        console.error("❌ ERREUR formation_module:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/formation_departement', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+
+        const result = await pool.request().query(`SELECT * FROM formation_departement`);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+app.post('/api/formation_departement', async (req, res) => {
+    const { formation_id, departement_id } = req.body;
+
+    // Vérification des données reçues
+    if (!formation_id || !departement_id) {
+        console.log("⚠️ formation_id ou departement_id manquant:", req.body);
+        return res.status(400).json({ message: "formation_id et departement_id sont requis" });
+    }
+
+    try {
+        // 🔎 Afficher la base connectée
+        const testDb = await new sql.Request().query("SELECT DB_NAME() AS db");
+        console.log("🧠 Base actuelle côté backend:", testDb.recordset[0].db);
+
+        // 🔎 Tester si la table formation_departement existe bien
+        const testTable = await new sql.Request().query("SELECT TOP 1 * FROM dbo.formation_departement");
+        console.log("✅ Accès table formation_departement OK");
+
+        // 🔧 Insertion dans la table pivot
+        const request = new sql.Request();
+        request.input('formation_id', sql.Int, formation_id);
+        request.input('departement_id', sql.Int, departement_id);
+
+        await request.query(`
+        INSERT INTO dbo.formation_departement (formation_id, departement_id)
+        VALUES (@formation_id, @departement_id)
+      `);
+
+        res.status(201).json({ message: 'Lien formation-département ajouté avec succès' });
+
+    } catch (err) {
+        console.error("❌ ERREUR formation_departement:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+

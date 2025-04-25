@@ -48,7 +48,7 @@ import { MatDialog } from '@angular/material/dialog';
 })
 export class GestionUtilisateursComponent implements OnInit {
   displayedColumns: string[] = [
-    'select', 'name', 'email', 'password', 'societe', 'unite',
+    'select', 'name', 'email', 'societe', 'unite',
     'poste', 'departement', 'menu_cube', 'role', 'status', 'actions'
   ];
 
@@ -59,7 +59,7 @@ export class GestionUtilisateursComponent implements OnInit {
     email: string;
     password: string;
     societe_id: number;
-    postes_id: number;
+    poste_id: number;
     departement_id: number;
     status: boolean;
     profilePicture: string;
@@ -72,7 +72,7 @@ export class GestionUtilisateursComponent implements OnInit {
       email: '',
       password: '',
       societe_id: 0,
-      postes_id: 0,
+      poste_id: 0,
       departement_id: 0,
       status: true,
       profilePicture: '',
@@ -86,7 +86,7 @@ export class GestionUtilisateursComponent implements OnInit {
     email: '',
     password: '',
     societe_id: null,
-    postes_id: null,
+    poste_id: null,
     departement_id: null,
     status: false,
     profilePicture: null,
@@ -106,7 +106,6 @@ export class GestionUtilisateursComponent implements OnInit {
   selectedSocieteId: number | null = null; // Store selected société_id
   departements: any[] = []; // Store filtered départements
   imagePreview: string | null = null;
-  selectedFile: File | null = null;
   selectedUsers: Set<number> = new Set();
   searchMenuCube: string = '';
   filteredMenuCubes: any[] = [];
@@ -123,11 +122,16 @@ export class GestionUtilisateursComponent implements OnInit {
     password: '',
     societe_id: null,
     departement_id: null,
-    postes_id: null,
+    poste_id: null,
     unite_ids: [],
     menu_cube_ids: [],
     active: false
   };
+  selectedFile!: File;
+  uploadedFilePath!: string;
+  file: File | null = null; // ✅ Allow both File and null
+  loading: boolean = false;
+  shortLink: string = "";
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -145,7 +149,7 @@ export class GestionUtilisateursComponent implements OnInit {
       profilePicture: [''],
       societe_id: ['', Validators.required],
       departement_id: ['', Validators.required],
-      postes_id: [''],
+      poste_id: [''],
       unite_ids: [[]],
       menu_cube_ids: [[]],
       active: [true],
@@ -189,7 +193,6 @@ export class GestionUtilisateursComponent implements OnInit {
     const updatedUser = {
       ...this.selectedUser,
       status: this.selectedUser.status ? 1 : 0,
-      postes_id: this.selectedUser.postes_id || null, // Ensure it's being sent
       unite_ids: this.selectedUser.unite_ids || [],
       menu_cube_ids: this.selectedUser.menu_cube_ids || []
     };
@@ -223,7 +226,7 @@ export class GestionUtilisateursComponent implements OnInit {
 
     // Ensure poste_id is assigned correctly
     const matchingPoste = this.postes.find(p => p.nom === user.postes);
-    this.selectedUser.postes_id = matchingPoste ? matchingPoste.id : null;
+    this.selectedUser.poste_id = matchingPoste ? matchingPoste.id : null;
 
     // Ensure departement_id is assigned correctly
     const matchingDepartement = this.departements.find(d => d.nom === user.departement);
@@ -238,7 +241,7 @@ export class GestionUtilisateursComponent implements OnInit {
 
     console.log('Converted Status (Boolean):', this.selectedUser.status); // Should print `true` or `false`
     console.log('Société ID:', this.selectedUser.societe_id);
-    console.log('Poste ID:', this.selectedUser.postes_id);
+    console.log('Poste ID:', this.selectedUser.poste_id);
     console.log('Département ID:', this.selectedUser.departement_id);
     const uniteNames = user.unite ? user.unite.split(',').map((u: string) => u.trim()) : [];
     this.selectedUser.unite_ids = this.unites
@@ -264,7 +267,16 @@ export class GestionUtilisateursComponent implements OnInit {
     this.showEditUserForm = true;
 
   }
+  onUpload() {
+    if (!this.file) { // ✅ Ensure file is selected before upload
+      alert("Please select a file before uploading.");
+      return;
+    }
 
+    this.loading = true; // Start loading
+    console.log("Uploading file:", this.file);
+
+  }
   loadDropdownData() {
     this.userService.getSocietes().subscribe(data => this.societes = data);
     this.userService.getAllDepartements().subscribe(data => this.departements = data);
@@ -319,7 +331,12 @@ export class GestionUtilisateursComponent implements OnInit {
      }
    }*/
 
-
+  onChange(event: Event) {
+    const inputElement = event.target as HTMLInputElement; // ✅ Type assertion
+    if (inputElement.files && inputElement.files.length > 0) {
+      this.file = inputElement.files[0]; // ✅ Now TypeScript recognizes `files`
+    }
+  }
   onSubmit() {
     if (this.userForm.valid) {
 
@@ -332,7 +349,24 @@ export class GestionUtilisateursComponent implements OnInit {
       this.userService.createUser(formData).subscribe(response => {
         console.log('User created:', response);
         const userId = response.userId;
-
+        if (response && response.data && response.data.id) {
+          if (this.file) {
+            this.userService.upload(this.file, response.data.id).subscribe(
+              (event: any) => {
+                if (typeof event === 'object') {
+                  this.shortLink = event.link;
+                  this.loading = false; // Stop loading
+                }
+              },
+              (error) => {
+                console.error("Upload failed:", error);
+                this.loading = false;
+              }
+            );
+          }
+        } else {
+          console.error("Error: No ID returned from the server");
+        }
         formData.unite_ids.forEach((uniteId: number) => {
           this.userService.addUserUnite(userId, uniteId).subscribe(() => {
             console.log(`User ${userId} linked to Unite ${uniteId}`);
@@ -523,7 +557,7 @@ export class GestionUtilisateursComponent implements OnInit {
   }
 
   // ✅ Edit User
-  editUser(userId: number) {
+  editUser(userId: string) {
     this.userService.getUserById(userId).subscribe(userData => {
       this.user = userData; // Make sure `this.user` is properly set
       this.userForm.patchValue(userData); // Populate form fields

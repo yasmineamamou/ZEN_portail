@@ -36,20 +36,7 @@ export class PosteService {
     return this.http.post(`${this.baseUrl}/api/upload-fiche-fonction/${id}`, formData);
   }
 
-  upload(file: File, id: number): Observable<any> {
-    if (!id) {
-      console.error("Error: Upload failed because ID is undefined");
-      return throwError(() => new Error("ID is undefined"));
-    }
 
-    const formData = new FormData();
-    formData.append("file", file, file.name);
-
-    const uploadUrl = `${this.baseUrl}/api/upload-fiche-fonction/${id}`;
-    console.log("Uploading file to:", uploadUrl, "with file:", file); // Debugging log
-
-    return this.http.post(uploadUrl, formData);
-  }
   updateOrganigramme(file: File, id: number): Observable<any> {
     const formData = new FormData();
     formData.append("organigramme", file, file.name);

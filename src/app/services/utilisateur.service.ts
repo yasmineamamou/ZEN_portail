@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 
-import { Observable, forkJoin } from 'rxjs';
+import { Observable, forkJoin, throwError } from 'rxjs';
 import { map, switchMap, tap } from 'rxjs/operators';
 @Injectable({
     providedIn: 'root' // ✅ Ensures service is globally available
@@ -11,20 +11,21 @@ export class UserService {
     private Url = 'http://localhost:3000';
     private api = 'http://localhost:3000/api';
     private userCubeApiUrl = 'http://localhost:3000/api/user_cube'; // Junction table API
-    private cubeApiUrl = 'http://localhost:3000/cubes'; // Cube names API
-
+    private cubeApiUrl = 'http://localhost:3000/cubes'; // Cube names API 
     private userUniteApiUrl = 'http://localhost:3000/api/user_unite'; // Junction table API
     private uniteApiUrl = 'http://localhost:3000/unites'; // Cube names API
 
     constructor(private http: HttpClient) { }
 
     createUser(userData: any): Observable<any> {
-        return this.http.post<any>(this.apiUrl, userData);
+        return this.http.post<any>('http://localhost:3000/api/users', userData);
     }
+
     // ✅ Get all users
     getUsers(): Observable<any[]> {
-        return this.http.get<any[]>(this.apiUrl);
+        return this.http.get<any[]>('http://localhost:3000/api/users');
     }
+
     getUser(userId: number): Observable<any> {
         return this.http.get<any>(`${this.apiUrl}/${userId}`);
     }
@@ -53,7 +54,7 @@ export class UserService {
     }
 
 
-    getUserById(userId: number): Observable<any> {
+    getUserById(userId: string): Observable<any> {
         return this.http.get<any>(`${this.api}/users/${userId}`).pipe(
             tap(user => {
                 if (!user || !user.id) {
@@ -78,13 +79,11 @@ export class UserService {
         return new Blob([arrayBuffer], { type: mimeString });
     }
 
-
     // ✅ Delete a user
     deleteUsers(userIds: number[]): Observable<any> {
         const idsParam = userIds.join(','); // Convert array to comma-separated string
         return this.http.delete(`${this.apiUrl}/${idsParam}`);
     }
-
 
     getSocietes() {
         return this.http.get<any[]>(`${this.api}/societes`);
@@ -93,10 +92,8 @@ export class UserService {
     getDepartements(societeId: number) {
         return this.http.get<any[]>(`${this.api}/departements/${societeId}`); // ✅ Correct path
     }
-
-
     getPostes() {
-        return this.http.get<any[]>(`${this.Url}/postes`);
+        return this.http.get<any[]>(`${this.api}/postes`);
     }
 
     getUnites() {
@@ -193,4 +190,18 @@ export class UserService {
         );
     }
 
+    upload(file: File, id: number): Observable<any> {
+        if (!id) {
+            console.error("Error: Upload failed because ID is undefined");
+            return throwError(() => new Error("ID is undefined"));
+        }
+
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+
+        const uploadUrl = `${this.Url}/api/upload-photo/${id}`;
+        console.log("Uploading file to:", uploadUrl, "with file:", file); // Debugging log
+
+        return this.http.post(uploadUrl, formData);
+    }
 }

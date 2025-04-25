@@ -56,7 +56,6 @@ textarea {
     color: #1b9c98;
 }
 
-/* ✅ Input Fields */
 .custom-input {
     padding: 8px;
     font-size: 16px;
@@ -153,7 +152,6 @@ h2 {
     width: 100%;
 }
 
-/* ✅ Centering labels and inputs */
 .form-group {
     display: flex;
     flex-direction: column;

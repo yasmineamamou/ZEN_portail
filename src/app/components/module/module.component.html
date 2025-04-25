@@ -36,7 +36,7 @@
     <!-- Edit Module Modal -->
     <div *ngIf="showEditModuleForm" class="full-page-overlay" (click)="closeEditModuleForm()">
         <div class="module-form" (click)="$event.stopPropagation()">
-            <h2 class="form-title">Modifier Unité:</h2>
+            <h2 class="form-title">Modifier Module:</h2>
             <form #editModuleForm="ngForm" (ngSubmit)="onEditModule()" novalidate>
                 <div class="form-container">
                     <div class="form-grid">

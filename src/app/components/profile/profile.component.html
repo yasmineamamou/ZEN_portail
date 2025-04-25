@@ -1,0 +1,14 @@
+<div *ngIf="user; else loading">
+    <h2>{{ user.name }}</h2>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Role:</strong> {{ user.role }}</p>
+    <p><strong>Status:</strong> {{ user.status }}</p>
+
+    <img *ngIf="user.profilePicture" [src]="user.profilePicture" width="120" height="120" />
+</div>
+
+<ng-template #loading>
+    <p>Loading profile...</p>
+</ng-template>
+
+<p *ngIf="errorMsg" style="color:red;">{{ errorMsg }}</p>
