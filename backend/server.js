@@ -1197,7 +1197,7 @@ app.post('/api/upload-formation/:id', (req, res) => {
 
 app.post('/api/formations', async (req, res) => {
     try {
-        const { titre, description, objectif, piece_jointe, telechargable, modules } = req.body;
+        const { titre, description, objectif, piece_jointe, telechargable, modules, departements } = req.body;
 
         console.log("📦 Received formation data:", req.body);
 
@@ -1220,16 +1220,41 @@ app.post('/api/formations', async (req, res) => {
         const result = await request.query(insertQuery);
         const formationId = result.recordset[0].id;
 
-        // Insert into formation_module
+        // For modules
         if (modules && modules.length > 0) {
             for (const moduleId of modules) {
                 await pool.request()
                     .input('formation_id', sql.Int, formationId)
                     .input('module_id', sql.Int, moduleId)
                     .query(`
-                        INSERT INTO formation_module (formation_id, module_id)
-                        VALUES (@formation_id, @module_id)
-                    `);
+          IF NOT EXISTS (
+            SELECT 1 FROM formation_module
+            WHERE formation_id = @formation_id AND module_id = @module_id
+          )
+          BEGIN
+            INSERT INTO formation_module (formation_id, module_id)
+            VALUES (@formation_id, @module_id)
+          END
+        `);
+            }
+        }
+
+        // For departements
+        if (departements && departements.length > 0) {
+            for (const departementId of departements) {
+                await pool.request()
+                    .input('formation_id', sql.Int, formationId)
+                    .input('departement_id', sql.Int, departementId)
+                    .query(`
+          IF NOT EXISTS (
+            SELECT 1 FROM formation_departement
+            WHERE formation_id = @formation_id AND departement_id = @departement_id
+          )
+          BEGIN
+            INSERT INTO formation_departement (formation_id, departement_id)
+            VALUES (@formation_id, @departement_id)
+          END
+        `);
             }
         }
 
@@ -1295,7 +1320,6 @@ app.get('/api/formation_module', async (req, res) => {
         res.status(500).send(err.message);
     }
 });
-
 app.post('/api/formation_module', async (req, res) => {
     const { formation_id, module_id } = req.body;
 
@@ -1304,7 +1328,9 @@ app.post('/api/formation_module', async (req, res) => {
     }
 
     try {
-        const request = new sql.Request();
+        const pool = await sql.connect(dbConfig); // ✅ ouvre une connexion
+        const request = pool.request(); // ✅ utilise la connexion
+
         request.input('formation_id', sql.Int, formation_id);
         request.input('module_id', sql.Int, module_id);
 
@@ -1314,11 +1340,14 @@ app.post('/api/formation_module', async (req, res) => {
       `);
 
         res.status(201).json({ message: 'Lien formation-module ajouté avec succès' });
+
+        await pool.close(); // facultatif
     } catch (err) {
         console.error("❌ ERREUR formation_module:", err);
         res.status(500).json({ error: err.message });
     }
 });
+
 
 app.get('/api/formation_departement', async (req, res) => {
     try {
@@ -1333,36 +1362,27 @@ app.get('/api/formation_departement', async (req, res) => {
 app.post('/api/formation_departement', async (req, res) => {
     const { formation_id, departement_id } = req.body;
 
-    // Vérification des données reçues
     if (!formation_id || !departement_id) {
-        console.log("⚠️ formation_id ou departement_id manquant:", req.body);
         return res.status(400).json({ message: "formation_id et departement_id sont requis" });
     }
 
     try {
-        // 🔎 Afficher la base connectée
-        const testDb = await new sql.Request().query("SELECT DB_NAME() AS db");
-        console.log("🧠 Base actuelle côté backend:", testDb.recordset[0].db);
+        const pool = await sql.connect(dbConfig); // <-- ajoute cette ligne
+        const request = pool.request(); // <-- change ici
 
-        // 🔎 Tester si la table formation_departement existe bien
-        const testTable = await new sql.Request().query("SELECT TOP 1 * FROM dbo.formation_departement");
-        console.log("✅ Accès table formation_departement OK");
-
-        // 🔧 Insertion dans la table pivot
-        const request = new sql.Request();
         request.input('formation_id', sql.Int, formation_id);
         request.input('departement_id', sql.Int, departement_id);
 
         await request.query(`
-        INSERT INTO dbo.formation_departement (formation_id, departement_id)
-        VALUES (@formation_id, @departement_id)
-      `);
+            INSERT INTO dbo.formation_departement (formation_id, departement_id)
+            VALUES (@formation_id, @departement_id)
+        `);
 
-        res.status(201).json({ message: 'Lien formation-département ajouté avec succès' });
+        res.status(201).json({ message: 'Lien formation-departement ajouté avec succès' });
 
+        await pool.close(); // optionnel si tu veux fermer
     } catch (err) {
         console.error("❌ ERREUR formation_departement:", err);
         res.status(500).json({ error: err.message });
     }
 });
-

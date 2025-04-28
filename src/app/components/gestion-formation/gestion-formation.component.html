@@ -11,7 +11,6 @@
                 (input)="onSearchChange()" class="search-input" />
         </div>
 
-        <!-- Module Filter Dropdown -->
         <select [(ngModel)]="selectedModule" (change)="onModuleFilterChange()" class="filter">
             <option value="">Filtrer par: </option>
             <option *ngFor="let group of moduleGroups" [value]="group.moduleName">
@@ -25,48 +24,47 @@
 
             <form [formGroup]="formationForm" (ngSubmit)="onAddFormation()" novalidate>
 
-                <label for="titre">TITRE*</label>
+                <label for="titre">TITRE: *</label>
                 <input id="titre" type="text" formControlName="titre" />
 
-                <label for="description">DESCRIPTION*</label>
+                <label for="description">DESCRIPTION: *</label>
                 <textarea id="description" formControlName="description"></textarea>
 
                 <div class="row-container">
                     <div class="half">
-                        <label for="objectif">OBJECTIF*</label>
+                        <label for="objectif">OBJECTIF: *</label>
                         <input id="objectif" type="text" formControlName="objectif" />
                     </div>
                     <div class="half">
-                        <label for="modules">MODULE:*</label>
-                        <div #dropdownRef class="custom-dropdown-wrapper" (click)="onDropdownClick($event)"
-                            tabindex="0">
-
-                            <div class="custom-dropdown-trigger">
-                                {{ selectedModulesLabel() }}
-                                <span class="dropdown-icon">⌄</span>
-                            </div>
-                            <div class="custom-dropdown-content" *ngIf="showModuleDropdown">
-                                <div class="custom-option" *ngFor="let m of modules">
-                                    <input type="checkbox" [checked]="isModuleSelected(m.id)"
-                                        (change)="onModuleCheckChange(m.id); $event.stopPropagation()" />
-                                    <span>{{ m.nom }}</span>
-                                </div>
-                            </div>
-                        </div>
                         <div class="form-group">
-                            <label class="custom-label">SOCIÉTÉ ASSOCIÉE: *</label>
-                            <select [(ngModel)]="newFormation.departements" [ngModelOptions]="{standalone: true}"
-                                name="departements" required class="custom-input">
-                                <option *ngFor="let departement of departements" [value]="departement.id">{{
-                                    departement.nom }}</option>
-                            </select>
+                            <label class="custom-label">MODULES ASSOCIÉS*</label>
+                            <mat-select class="custom-mat-select" [(ngModel)]="newFormation.module_ids"
+                                name="module_ids" [ngModelOptions]="{ standalone: true }" multiple>
+                                <mat-option *ngFor="let module of modules" [value]="module.id">
+                                    {{ module.nom }}
+                                </mat-option>
+                            </mat-select>
                         </div>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="custom-label">Organigramme du departement: </label>
+                    <label class="custom-label">DÉPARTEMENTS ASSOCIÉS*</label>
+                    <mat-select [(ngModel)]="newFormation.departements" name="departements"
+                        [ngModelOptions]="{ standalone: true }" multiple>
+
+                        <mat-option *ngFor="let departement of departements" [value]="departement.id" class="liste">
+                            {{ departement.nom }}
+                        </mat-option>
+                    </mat-select>
+                </div>
+                <div class="upload-area">
+                    <div class="upload-radio-icon">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                    </div>
+                    <span>Vidéo,PDF,Word,Excel,Image</span>
                     <input class="form-control" type="file" (change)="onChange($event)">
                 </div>
+
                 <label>TÉLÉCHARGEABLE:*</label>
                 <div class="radio-group">
                     <label><input type="radio" [value]="true" formControlName="telechargable" /> OUI</label>

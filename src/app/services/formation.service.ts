@@ -55,10 +55,10 @@ export class FormationService {
 
 
   linkModuleToFormation(formationId: number, moduleId: number): Observable<any> {
-    return this.http.post('/api/formation_module', { formation_id: formationId, module_id: moduleId });
+    return this.http.post(`${this.api}/formation_module`, { formation_id: formationId, module_id: moduleId });
   }
   addFormationWithFile(formData: FormData): Observable<any> {
-    return this.http.post('/api/formations', formData);
+    return this.http.post('http://localhost:3000/api/formations', formData);
   }
   addFormationDepartement(formationId: number, departementId: number): Observable<any> {
     return this.http.post('http://localhost:3000/api/formation_departement', { formation_id: formationId, departement_id: departementId });

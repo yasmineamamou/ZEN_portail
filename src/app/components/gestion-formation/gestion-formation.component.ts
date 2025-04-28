@@ -1,18 +1,30 @@
 import { CommonModule } from '@angular/common';
-import { Component, ViewChild } from '@angular/core';
+import { Component, ViewChild, ElementRef, HostListener } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormationService } from '../../services/formation.service';
-import { MatSort } from '@angular/material/sort';
-import { MatTableDataSource } from '@angular/material/table';
-import { MatPaginator } from '@angular/material/paginator';
+import { MatSort, MatSortModule } from '@angular/material/sort';
+import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { HttpClient } from '@angular/common/http';
-import { ElementRef, HostListener } from '@angular/core';
 import { forkJoin } from 'rxjs';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatInputModule } from '@angular/material/input';
 
+import { MatCheckboxChange } from '@angular/material/checkbox';
+import { MatSelectModule } from '@angular/material/select';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 @Component({
   selector: 'app-gestion-formation',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule,
+    MatPaginatorModule,
+    MatTableModule,
+    MatSelectModule,
+    MatSortModule,
+    MatIconModule,
+    MatButtonModule,
+    MatCheckboxModule,],
   templateUrl: './gestion-formation.component.html',
   styleUrl: './gestion-formation.component.css'
 })
@@ -24,13 +36,15 @@ export class GestionFormationComponent {
   showAddFormationForm = false;
   showEditFormationForm = false;
   isEditMode = false;
-  // newFormation = { titre: '', description: '', objectif: '', telechargable: false, module_ids: null };
   selectedFormation: any = { id: null, nom: '', description: '', objectif: '', telechargable: false, module_ids: null, departements: null };
   shortLink: string = "";
   loading: boolean = false; // Flag variable
   file: File | null = null; // ✅ Allow both File and null
   modules: any[] = [];
   departements: any[] = [];
+  selectedModules: number[] = [];
+  dropdownOpen = false;
+  showModuleDropdown = false;
   formationForm: FormGroup;
   newFormation: {
     titre: string;
@@ -48,7 +62,6 @@ export class GestionFormationComponent {
       module_ids: [],
       departements: [],
     };
-  selectedModules: number[] = [];
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
@@ -72,105 +85,52 @@ export class GestionFormationComponent {
     this.loadModule();
     this.loadDepartements(); // ✅
   }
-  showModuleDropdown = false;
+
   @HostListener('document:click', ['$event'])
+  onClickOutside(event: MouseEvent) {
+    const clickedInside = this.dropdownRef?.nativeElement.contains(event.target);
+    if (!clickedInside) {
+      this.dropdownOpen = false;
+    }
+  }
   handleOutsideClick(event: MouseEvent) {
     const target = event.target as HTMLElement;
     if (this.dropdownRef && !this.dropdownRef.nativeElement.contains(target)) {
       this.showModuleDropdown = false;
     }
   }
-
-
-  loadDepartements() {
-    this.formationService.getDepartements().subscribe(data => {
-      this.departements = data;
-    });
+  toggleDropdown() {
+    this.dropdownOpen = !this.dropdownOpen;
+  }
+  toggleDepartementDropdown() {
+    this.dropdownOpen = !this.dropdownOpen;
   }
 
-  toggleModuleDropdown() {
-    this.showModuleDropdown = !this.showModuleDropdown;
-  }
-  onDropdownClick(event: MouseEvent) {
-    // Prevent closing when clicking inside
-    const target = event.target as HTMLElement;
-    if (
-      target.tagName === 'INPUT' ||
-      target.tagName === 'LABEL' ||
-      target.closest('.custom-dropdown-content')
-    ) {
-      return; // Do nothing if clicking inside
-    }
 
-    this.toggleModuleDropdown(); // Only toggle when clicking the outside wrapper
-  }
+  onDepartementCheckboxChange(event: any) {
+    const id = +event.target.value;
 
-  onModuleCheckChange(id: number) {
-    const currentSelection = this.formationForm.value.modules || [];
-    if (currentSelection.includes(id)) {
-      this.formationForm.patchValue({
-        modules: currentSelection.filter((i: number) => i !== id),
-      });
+    if (event.target.checked) {
+      this.newFormation.departements.push(id);
     } else {
-      this.formationForm.patchValue({
-        modules: [...currentSelection, id],
-      });
+      this.newFormation.departements = this.newFormation.departements.filter(d => d !== id);
     }
   }
 
-  isModuleSelected(id: number): boolean {
-    return this.formationForm.value.modules?.includes(id);
-  }
-
-  selectedModulesLabel(): string {
-    const selected = this.formationForm.value.modules || [];
-    if (selected.length === 0) return '';
-    return this.modules
-      .filter((m) => selected.includes(m.id))
-      .map((m) => m.nom)
+  getSelectedDepartementsLabel(): string {
+    return this.departements
+      .filter(dep => this.newFormation.departements.includes(dep.id))
+      .map(dep => dep.nom)
       .join(', ');
   }
-  onModulesChange(event: Event) {
-    const selected = Array.from((event.target as HTMLSelectElement).selectedOptions)
-      .map(option => Number(option.value));
-    console.log('Selected modules:', selected);
+
+
+  onModuleNgModelChange(event: any) {
+    console.log("📦 Updated module IDs:", this.selectedModules);
+    this.formationForm.patchValue({ modules: this.selectedModules }); // ✅ sync with form
   }
 
-  loadModule() {
-    this.formationService.getModule().subscribe(data => {
-      this.modules = data.map(module => ({
-        ...module,
-        id: Number(module.id) // ✅ Convert id to number
-      }));
-    });
-  }
-  loadFormationsByModule() {
-    forkJoin({
-      formations: this.formationService.getFormation(),
-      modules: this.formationService.getModule(),
-      links: this.formationService.getFormationModules()
-    }).subscribe(({ formations, modules, links }) => {
-      const grouped: any[] = [];
 
-      modules.forEach((mod: any) => {
-        const formationIds = links
-          .filter((link: any) => link.module_id === mod.id)
-          .map((link: any) => link.formation_id);
-
-        const relatedFormations = formations.filter((f: any) =>
-          formationIds.includes(f.id)
-        );
-
-        grouped.push({
-          moduleName: mod.nom,
-          formations: relatedFormations
-        });
-      });
-
-      this.moduleGroups = grouped;
-      console.log("✅ Grouped by module (frontend logic):", this.moduleGroups);
-    });
-  }
 
   onSearchChange() {
     console.log('Search Term:', this.searchTerm);
@@ -225,7 +185,12 @@ export class GestionFormationComponent {
     }
   }
   onAddFormation() {
-    const formationData = this.formationForm.value;
+    const formationData = {
+      ...this.formationForm.value,
+      modules: this.newFormation.module_ids,
+      departements: this.newFormation.departements
+    };
+    console.log("📤 Sending formationData:", formationData);
 
     this.formationService.addFormation(formationData).subscribe(res => {
       const formationId = res?.data?.id;
@@ -235,21 +200,104 @@ export class GestionFormationComponent {
         if (this.file) {
           this.formationService.uploadOrganigrammeFormation(this.file, formationId).subscribe();
         }
-
-        // Add formation_module relations
-        const moduleIds = formationData.modules;
-        moduleIds.forEach((moduleId: number) => {
-          this.formationService.linkModuleToFormation(formationId, moduleId).subscribe();
-        });
-        formationData.departements.forEach((depId: number) => {
-          this.formationService.addFormationDepartement(formationId, depId).subscribe();
-        });
         alert("Formation created successfully!");
         this.loadFormationsByModule();
         this.showAddFormationForm = false;
       }
     });
+  }
 
+  loadDepartements() {
+    this.formationService.getDepartements().subscribe(data => {
+      this.departements = data;
+    });
+  }
+
+  toggleModuleDropdown() {
+    this.showModuleDropdown = !this.showModuleDropdown;
+  }
+
+  onDropdownClick(event: MouseEvent) {
+    // Prevent closing when clicking inside
+    const target = event.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'LABEL' ||
+      target.closest('.custom-dropdown-content')
+    ) {
+      return; // Do nothing if clicking inside
+    }
+
+    this.toggleModuleDropdown(); // Only toggle when clicking the outside wrapper
+  }
+
+  onModuleCheckChange(id: number) {
+    const currentSelection = this.formationForm.value.modules || [];
+    if (currentSelection.includes(id)) {
+      this.formationForm.patchValue({
+        modules: currentSelection.filter((i: number) => i !== id),
+      });
+    } else {
+      this.formationForm.patchValue({
+        modules: [...currentSelection, id],
+      });
+    }
+  }
+
+  isModuleSelected(id: number): boolean {
+    return this.formationForm.value.modules?.includes(id);
+  }
+
+  selectedModulesLabel(): string {
+    const selected = this.formationForm.value.modules || [];
+    if (selected.length === 0) return '';
+    return this.modules
+      .filter((m) => selected.includes(m.id))
+      .map((m) => m.nom)
+      .join(', ');
+  }
+
+  onModulesChange(event: Event) {
+    const selected = Array.from((event.target as HTMLSelectElement).selectedOptions)
+      .map(option => Number(option.value));
+    console.log('Selected modules:', selected);
+  }
+
+  loadModule() {
+    this.formationService.getModule().subscribe(data => {
+      this.modules = data.map(module => ({
+        ...module,
+        id: Number(module.id) // ✅ Convert id to number
+      }));
+    });
+  }
+
+  loadFormationsByModule() {
+    forkJoin({
+      formations: this.formationService.getFormation(),
+      modules: this.formationService.getModule(),
+      links: this.formationService.getFormationModules()
+    }).subscribe(({ formations, modules, links }) => {
+      const grouped: any[] = [];
+
+      modules.forEach((mod: any) => {
+        const formationIds = links
+          .filter((link: any) => link.module_id === mod.id)
+          .map((link: any) => link.formation_id);
+
+        const relatedFormations = formations.filter((f: any) =>
+          formationIds.includes(f.id)
+        );
+
+        grouped.push({
+          moduleName: mod.nom,
+          formations: relatedFormations
+        });
+      });
+
+      this.moduleGroups = grouped;
+      console.log("✅ Grouped by module (frontend logic):", this.moduleGroups);
+    });
   }
 
 }
