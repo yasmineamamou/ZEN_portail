@@ -4,7 +4,7 @@ const dbConfig = {
     user: 'my_db_user',
     password: 'yasmineamamou',
     server: 'localhost',
-    database: 'zen_portail',
+    database: 'zen_portail1',
     options: {
         encrypt: false,
         trustServerCertificate: true

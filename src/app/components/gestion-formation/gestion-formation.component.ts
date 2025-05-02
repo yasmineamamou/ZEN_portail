@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, ViewChild, ElementRef, HostListener } from '@angular/core';
-import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormationService } from '../../services/formation.service';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
@@ -8,9 +8,6 @@ import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatInputModule } from '@angular/material/input';
-
-import { MatCheckboxChange } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -30,19 +27,22 @@ import { MatIconModule } from '@angular/material/icon';
 })
 export class GestionFormationComponent {
   searchTerm: string = '';
-  selectedModule: string = '';
-  moduleGroups: any[] = [];
-  dataSource = new MatTableDataSource<any>([]);
-  showAddFormationForm = false;
-  showEditFormationForm = false;
-  isEditMode = false;
-  selectedFormation: any = { id: null, nom: '', description: '', objectif: '', telechargable: false, module_ids: null, departements: null };
-  shortLink: string = "";
-  loading: boolean = false; // Flag variable
-  file: File | null = null; // ✅ Allow both File and null
+  formations: any[] = [];
   modules: any[] = [];
   departements: any[] = [];
-  selectedModules: number[] = [];
+  formationModules: any[] = [];
+  formationDepartements: any[] = [];
+
+  isEditMode = false;
+  editingFormationId: number | null = null;
+  selectedModule: string = '';
+  moduleGroups: any[] = [];
+  openMenus: { [key: string]: boolean } = {};
+  showAddFormationForm = false;
+  showEditFormationForm = false;
+  selectedFormation: any = { id: null, nom: '', description: '', objectif: '', telechargable: false, module_ids: null, departements: null };
+  file: File | null = null; // ✅ Allow both File and null
+
   dropdownOpen = false;
   showModuleDropdown = false;
   formationForm: FormGroup;
@@ -62,7 +62,7 @@ export class GestionFormationComponent {
       module_ids: [],
       departements: [],
     };
-
+  editFormationForm: FormGroup;
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild('dropdownRef') dropdownRef!: ElementRef;
@@ -77,13 +77,22 @@ export class GestionFormationComponent {
         modules: [[]],
         departements: [[]]
       });
+      this.editFormationForm = this.fb.group({
+        titre: ['', Validators.required],
+        description: ['', Validators.required],
+        objectif: ['', Validators.required],
+        telechargable: [false, Validators.required]
+      });
+
     }
+
   }
 
   ngOnInit(): void {
     this.loadFormationsByModule();
     this.loadModule();
     this.loadDepartements(); // ✅
+    this.loadAllFormationsData();
   }
 
   @HostListener('document:click', ['$event'])
@@ -99,37 +108,6 @@ export class GestionFormationComponent {
       this.showModuleDropdown = false;
     }
   }
-  toggleDropdown() {
-    this.dropdownOpen = !this.dropdownOpen;
-  }
-  toggleDepartementDropdown() {
-    this.dropdownOpen = !this.dropdownOpen;
-  }
-
-
-  onDepartementCheckboxChange(event: any) {
-    const id = +event.target.value;
-
-    if (event.target.checked) {
-      this.newFormation.departements.push(id);
-    } else {
-      this.newFormation.departements = this.newFormation.departements.filter(d => d !== id);
-    }
-  }
-
-  getSelectedDepartementsLabel(): string {
-    return this.departements
-      .filter(dep => this.newFormation.departements.includes(dep.id))
-      .map(dep => dep.nom)
-      .join(', ');
-  }
-
-
-  onModuleNgModelChange(event: any) {
-    console.log("📦 Updated module IDs:", this.selectedModules);
-    this.formationForm.patchValue({ modules: this.selectedModules }); // ✅ sync with form
-  }
-
 
 
   onSearchChange() {
@@ -176,35 +154,114 @@ export class GestionFormationComponent {
     this.showEditFormationForm = true;
   }
 
-  closeEditFormationForm() {
-    this.showEditFormationForm = false;
-  }
-  deleteFormation(id: number) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cette Formation ?')) {
-      this.formationService.deleteFormation(id).subscribe(() => this.loadFormationsByModule());
-    }
-  }
+
   onAddFormation() {
     const formationData = {
       ...this.formationForm.value,
       modules: this.newFormation.module_ids,
       departements: this.newFormation.departements
     };
-    console.log("📤 Sending formationData:", formationData);
+
+    console.log("📤 Sending formation data:", formationData);
 
     this.formationService.addFormation(formationData).subscribe(res => {
       const formationId = res?.data?.id;
 
       if (formationId) {
-        // Upload file
         if (this.file) {
-          this.formationService.uploadOrganigrammeFormation(this.file, formationId).subscribe();
+          this.formationService.uploadOrganigrammeFormation(this.file, formationId).subscribe(() => {
+            alert("✅ File uploaded!");
+          });
         }
-        alert("Formation created successfully!");
+
+        alert("✅ Formation created successfully!");
         this.loadFormationsByModule();
         this.showAddFormationForm = false;
       }
+    }, err => {
+      console.error("❌ Error creating formation:", err);
     });
+  }
+
+  loadFormationsWithRelations() {
+    forkJoin({
+      formations: this.formationService.getFormation(),
+      modulesMap: this.formationService.getFormationModules(),
+      departementsMap: this.formationService.getDepartements()
+    }).subscribe(({ formations, modulesMap, departementsMap }) => {
+      // Attach related modules & departements to each formation
+      this.formations = formations.map((f: any) => ({
+        ...f,
+        modules: modulesMap.filter((m: any) => m.formation_id === f.id),
+        departements: departementsMap.filter((d: any) => d.formation_id === f.id)
+      }));
+    });
+  }
+  onEdit(formation: any) {
+    console.log("🔍 Formation ID to match:", formation.id);
+    console.log("📦 All formationDepartements:", this.formationDepartements);
+
+    // 🔎 Type check debug
+    this.formationDepartements.forEach(fd => {
+      console.log(`🔎 Comparing: ${typeof fd.formation_id} (${fd.formation_id}) vs ${typeof formation.id} (${formation.id})`);
+    });
+
+    const departements = this.formationDepartements
+      .filter(d => +d.formation_id === +formation.id)
+      .map(d => d.departement_id);
+
+    const module_ids = this.formationModules
+      .filter(m => +m.formation_id === +formation.id)
+      .map(m => m.module_id);
+
+    console.log("✅ Matched departement_ids:", departements);
+    console.log("✅ Matched module_ids:", module_ids);
+
+    this.selectedFormation = {
+      ...formation,
+      module_ids: module_ids,
+      departements: departements,
+      organigramme_path: formation.organigramme_path
+    };
+
+    this.editFormationForm.patchValue({
+      titre: formation.titre,
+      description: formation.description,
+      objectif: formation.objectif,
+      telechargable: formation.telechargable
+    });
+
+    this.showEditFormationForm = true;
+  }
+
+
+  onEditFormation() {
+    const updatedData = {
+      ...this.editFormationForm.value,
+      modules: this.selectedFormation.module_ids,
+      departements: this.selectedFormation.departements
+    };
+
+    console.log("📤 Sending update:", updatedData); // ✅ add this
+
+    this.formationService.updateFormation(this.selectedFormation.id, updatedData).subscribe(() => {
+      if (this.file) {
+        this.formationService.uploadOrganigrammeFormation(this.file, this.selectedFormation.id).subscribe();
+      }
+
+      alert("Formation mise à jour !");
+      this.loadAllFormationsData();
+      this.showEditFormationForm = false;
+    });
+  }
+  closeEditFormationForm() {
+    this.showEditFormationForm = false;
+    this.editFormationForm.reset();
+    this.selectedFormation = {
+      module_ids: [],
+      departements: [],
+      organigramme_path: null
+    };
   }
 
   loadDepartements() {
@@ -231,38 +288,6 @@ export class GestionFormationComponent {
     this.toggleModuleDropdown(); // Only toggle when clicking the outside wrapper
   }
 
-  onModuleCheckChange(id: number) {
-    const currentSelection = this.formationForm.value.modules || [];
-    if (currentSelection.includes(id)) {
-      this.formationForm.patchValue({
-        modules: currentSelection.filter((i: number) => i !== id),
-      });
-    } else {
-      this.formationForm.patchValue({
-        modules: [...currentSelection, id],
-      });
-    }
-  }
-
-  isModuleSelected(id: number): boolean {
-    return this.formationForm.value.modules?.includes(id);
-  }
-
-  selectedModulesLabel(): string {
-    const selected = this.formationForm.value.modules || [];
-    if (selected.length === 0) return '';
-    return this.modules
-      .filter((m) => selected.includes(m.id))
-      .map((m) => m.nom)
-      .join(', ');
-  }
-
-  onModulesChange(event: Event) {
-    const selected = Array.from((event.target as HTMLSelectElement).selectedOptions)
-      .map(option => Number(option.value));
-    console.log('Selected modules:', selected);
-  }
-
   loadModule() {
     this.formationService.getModule().subscribe(data => {
       this.modules = data.map(module => ({
@@ -271,7 +296,6 @@ export class GestionFormationComponent {
       }));
     });
   }
-
   loadFormationsByModule() {
     forkJoin({
       formations: this.formationService.getFormation(),
@@ -291,13 +315,99 @@ export class GestionFormationComponent {
 
         grouped.push({
           moduleName: mod.nom,
-          formations: relatedFormations
+          formations: relatedFormations,
+          currentPage: 1,         // ✅ add pagination state
+          itemsPerPage: 4         // ✅ default items per page
         });
       });
 
       this.moduleGroups = grouped;
       console.log("✅ Grouped by module (frontend logic):", this.moduleGroups);
     });
+  }
+  toggleMenu(groupIndex: number, formationId: number): void {
+    const key = `${groupIndex}_${formationId}`;
+    if (this.openMenus[key]) {
+      this.openMenus[key] = false;
+    } else {
+      this.openMenus = {}; // Close all others
+      this.openMenus[key] = true;
+    }
+  }
+
+  onDelete(id: number) {
+    if (confirm("Voulez-vous vraiment supprimer cette formation ?")) {
+      this.formationService.deleteFormation(id).subscribe(() => {
+        alert("Formation supprimée !");
+        this.loadFormationsByModule();
+      }, error => {
+        console.error("❌ Erreur suppression:", error);
+      });
+    }
+  }
+
+  loadAllFormationsData() {
+    forkJoin({
+      formations: this.formationService.getFormation(),
+      formationModules: this.formationService.getFormationModules(),
+      formationDepartements: this.formationService.getFormationDepartements(),
+      modules: this.formationService.getModule(),
+      departements: this.formationService.getDepartements()
+    }).subscribe(({ formations, formationModules, formationDepartements, modules, departements }) => {
+      this.formations = formations;
+      this.modules = modules;
+      this.departements = departements;
+      this.formationModules = formationModules;
+      this.formationDepartements = formationDepartements; // ✅ this line is critical
+      this.formations = formations.map(f => ({
+        ...f,
+        modules: formationModules.filter(m => m.formation_id === f.id),
+        departements: formationDepartements.filter(d => d.formation_id === f.id)
+      }));
+      console.log("✅ formationDepartements loaded:", this.formationDepartements);
+    });
+  }
+
+  onSend(formation: any) {
+    console.log('Send:', formation);
+    // Trigger your send logic here
+  }
+  getPaginatedFormations(group: any): any[] {
+    const term = this.searchTerm?.trim().toLowerCase() || '';
+
+    let filtered = group.formations;
+    if (term) {
+      filtered = filtered.filter((f: { titre: string; file_type: string; }) =>
+        f.titre?.toLowerCase().includes(term) ||
+        f.file_type?.toLowerCase().includes(term)
+      );
+    }
+
+    const start = (group.currentPage - 1) * group.itemsPerPage;
+    const end = start + group.itemsPerPage;
+
+    return filtered.slice(start, end);
+  }
+
+
+  getTotalPages(group: any): number[] {
+    const total = Math.ceil(group.formations.length / group.itemsPerPage);
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  changePage(group: any, page: number): void {
+    group.currentPage = page;
+  }
+  prevPage(group: any): void {
+    if (group.currentPage > 1) {
+      group.currentPage--;
+    }
+  }
+
+  nextPage(group: any): void {
+    if (group.currentPage < this.getTotalPages(group).length) {
+      group.currentPage++;
+    }
   }
 
 }

@@ -28,8 +28,9 @@ export class FormationService {
     return this.http.put(`${this.apiUrl}/${id}`, formation);
   }
 
+
   deleteFormation(id: number): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/${id}`);
+    return this.http.delete(`http://localhost:3000/api/formations/${id}`);
   }
 
   uploadOrganigrammeFormation(file: File, id: number): Observable<any> {
@@ -68,6 +69,13 @@ export class FormationService {
   }
   getFormationModules(): Observable<any[]> {
     return this.http.get<any[]>('http://localhost:3000/api/formation_module');
+  }
+
+  getFormationDepartements() {
+    return this.http.get<any[]>('http://localhost:3000/api/formation_departement');
+  }
+  getFormationsByFileType(type: string): Observable<any[]> {
+    return this.http.get<any[]>(`http://localhost:3000/api/formations/type/${type}`);
   }
 
 }

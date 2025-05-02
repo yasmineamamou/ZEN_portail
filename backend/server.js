@@ -1119,78 +1119,62 @@ app.delete('/api/module/:id', async (req, res) => {
 });
 app.get('/api/formations', async (req, res) => {
     try {
-        const result = await sql.query('SELECT * FROM formation');
-        res.json(result.recordset);
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM dbo.formation');
+        res.send(result.recordset); // ✅ must return array
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Error fetching formations:", err.message);
+        res.status(500).send({ error: err.message });
     }
 });
 app.post('/api/upload-formation/:id', (req, res) => {
     const formationId = req.params.id;
 
-    if (!formationId) {
-        return res.status(400).json({ message: "Formation ID is required" });
-    }
-
     const form = new formidable.IncomingForm();
     const uploadDir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir);
-    }
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
     form.uploadDir = uploadDir;
     form.keepExtensions = true;
 
     form.parse(req, async (err, fields, files) => {
-        if (err) {
-            console.error("Formidable error:", err);
-            return res.status(500).json({ message: 'File upload failed', error: err });
-        }
+        if (err) return res.status(500).json({ message: 'Upload error', error: err });
 
-        console.log("Files received:", files);
-
-        // ✅ Correction ici
-        const file = files.organigramme ? files.organigramme[0] : null;
-
-        if (!file) {
-            return res.status(400).json({ message: "No file uploaded" });
-        }
+        const file = files.organigramme?.[0];
+        if (!file) return res.status(400).json({ message: "No file uploaded" });
 
         const originalFileName = file.originalFilename;
+        const fileType = path.extname(originalFileName).substring(1).toLowerCase(); // ✅ detect type
         const newFileName = `${formationId}_${originalFileName}`;
         const newPath = path.join(uploadDir, newFileName);
         const dbFilePath = `/uploads/${newFileName}`;
+
         fs.rename(file.filepath, newPath, async (err) => {
-            if (err) {
-                return res.status(500).json({ message: 'Error moving file', error: err });
-            }
+            if (err) return res.status(500).json({ message: 'File move error', error: err });
 
             try {
                 const pool = await sql.connect(dbConfig);
-
-                // ✅ Recrée une nouvelle requête SQL
-                const updateReq = pool.request(); //
-                updateReq.input('id', sql.Int, formationId);
-                updateReq.input('piece_jointe', sql.NVarChar, dbFilePath);
-
-                await updateReq.query(`
-                UPDATE formation 
-                SET piece_jointe = @piece_jointe 
-                WHERE id = @id
-              `);
+                await pool.request()
+                    .input('id', sql.Int, formationId)
+                    .input('piece_jointe', sql.NVarChar, dbFilePath)
+                    .input('file_type', sql.NVarChar, fileType) // ✅ save type
+                    .query(`
+              UPDATE formation 
+              SET piece_jointe = @piece_jointe,
+                  file_type = @file_type
+              WHERE id = @id
+            `);
 
                 res.status(200).json({
-                    message: 'File uploaded and path updated successfully',
+                    message: "✅ File uploaded and type saved",
                     filePath: dbFilePath,
-                    fileName: originalFileName
+                    fileType: fileType
                 });
 
-            } catch (updateErr) {
-                console.error("❌ DB Update error:", updateErr);
-                res.status(500).json({ message: "Failed to update database", error: updateErr.message });
+            } catch (err) {
+                res.status(500).json({ message: "DB update failed", error: err.message });
             }
         });
-
     });
 });
 
@@ -1269,46 +1253,88 @@ app.post('/api/formations', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
-
 app.delete('/api/formations/:id', async (req, res) => {
+    const id = parseInt(req.params.id);
+
+    if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid formation ID" });
+    }
+
     try {
-        const { id } = req.params;
-        await sql.query`DELETE FROM formation WHERE id = ${id}`;
-        res.json({ message: 'formation deleted successfully' });
+        const pool = await poolPromise;
+
+        // ✅ Always declare `request` immediately after `pool`
+        const request = pool.request();
+
+        // 🔍 Confirm DB name for safety
+        const dbCheck = await request.query("SELECT DB_NAME() AS dbName");
+        console.log("✅ Connected to database:", dbCheck.recordset[0].dbName);
+
+        // ✅ Safely delete from all tables
+        await request.query(`DELETE FROM dbo.formation_module WHERE formation_id = ${id}`);
+        await request.query(`DELETE FROM dbo.formation_departement WHERE formation_id = ${id}`);
+        await request.query(`DELETE FROM dbo.formation WHERE id = ${id}`);
+
+        console.log(`🗑️ Formation ${id} deleted successfully`);
+        res.json({ message: "Formation deleted successfully" });
+
     } catch (err) {
+        console.error("❌ Error deleting formation:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
 app.put('/api/formations/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { titre, description, objectif, piece_jointe, telechargable } = req.body;
+    const { id } = req.params;
+    const { titre, description, objectif, telechargable, modules, departements } = req.body;
 
-        if (!id || !titre) {
-            return res.status(400).json({ error: 'ID and titre are required.' });
+    try {
+        const pool = await poolPromise;
+        const request = pool.request();
+
+        console.log("📦 Modules to insert:", modules);
+        console.log("📦 Departements to insert:", departements);
+
+        // Update main formation
+        await request.query(`
+        UPDATE dbo.formation
+        SET titre = '${titre}', description = '${description}', objectif = '${objectif}', telechargable = ${telechargable ? 1 : 0}
+        WHERE id = ${id}
+      `);
+
+        // Delete previous junctions
+        await request.query(`DELETE FROM dbo.formation_module WHERE formation_id = ${id}`);
+        await request.query(`DELETE FROM dbo.formation_departement WHERE formation_id = ${id}`);
+
+        if (Array.isArray(modules) && modules.length > 0) {
+            for (let moduleId of modules) {
+                await pool.request().query(`
+                INSERT INTO dbo.formation_module (formation_id, module_id)
+                VALUES (${id}, ${moduleId})
+              `);
+            }
         }
 
-        const query = `
-            UPDATE formation 
-            SET titre = @titre, description = @description, objectif = @objectif, piece_jointe = @piece_jointe, telechargable = @telechargable
-            WHERE id = @id
-        `;
-        const request = new sql.Request();
-        request.input('id', sql.Int, id);
-        request.input('titre', sql.NVarChar, titre);
-        request.input('description', sql.NVarChar, description);
-        request.input('objectif', sql.NVarChar, objectif);
-        request.input('piece_jointe', sql.NVarChar, piece_jointe);
-        request.input('telechargable', sql.NVarChar, telechargable);
+        if (Array.isArray(departements) && departements.length > 0) {
+            for (let depId of departements) {
+                console.log(`🧩 Inserting departement: formation_id=${id}, departement_id=${depId}`);
+                await pool.request().query(`
+                  INSERT INTO dbo.formation_departement (formation_id, departement_id)
+                  VALUES (${id}, ${depId})
+                `);
+            }
 
-        await request.query(query);
-        res.json({ message: 'formation updated successfully.' });
+        }
+
+
+        res.json({ message: 'Formation updated successfully' });
+
     } catch (err) {
-        res.status(500).json({ error: 'Failed to update formation' });
+        console.error("❌ Update error:", err); // 🔥 this will show the full reason
+        res.status(500).json({ error: err.message });
     }
 });
+
 const { poolPromise } = require('./db');
 
 
@@ -1347,7 +1373,6 @@ app.post('/api/formation_module', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
 
 app.get('/api/formation_departement', async (req, res) => {
     try {
