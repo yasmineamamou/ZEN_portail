@@ -77,5 +77,13 @@ export class FormationService {
   getFormationsByFileType(type: string): Observable<any[]> {
     return this.http.get<any[]>(`http://localhost:3000/api/formations/type/${type}`);
   }
+  // formation.service.ts
+  getConvertedImages(filename: string) {
+    return this.http.get<{ images: string[] }>(`http://localhost:3000/convert-pdf/${filename}`);
+  }
+
+  getPdfImagesById(id: number) {
+    return this.http.get<{ images: string[] }>(`http://localhost:3000/convert-from-db/${id}`);
+  }
 
 }

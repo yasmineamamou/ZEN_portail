@@ -141,6 +141,8 @@
         </form>
     </div>
 </div>
+
+
 <div *ngFor="let group of moduleGroups; let gi = index" class="module-group">
     <div class="module-header">
         <h2 class="module-title">{{ group.moduleName.toUpperCase() }}:</h2>
@@ -150,28 +152,68 @@
         </div>
     </div>
     <div class="formation-list">
-        <div class="formation-card" *ngFor="let formation of getPaginatedFormations(group)">
+        <!-- Add this inside your template -->
+        <div class="docx-preview" #docxContainer></div>
+
+        <!-- Formation Click -->
+        <div class="formation-card" *ngFor="let formation of getPaginatedFormations(group)"
+            (click)="formation.telechargable ? openFormationFile(formation) : previewFormationFile(formation)"
+            style="cursor: pointer;">
+
+
+
             <div class="card-content">
                 <div class="card-header">
-                    <div class="menu-button" (click)="toggleMenu(gi, formation.id)">
+                    <div class="menu-button" (click)="toggleMenu(gi, formation.id); $event.stopPropagation()">
                         &#8942;
                         <ul *ngIf="openMenus[gi + '_' + formation.id]" class="menu-options">
-                            <li (click)="onEdit(formation)">
+                            <li (click)="onEdit(formation); $event.stopPropagation()">
                                 <mat-icon>edit</mat-icon> Modifier
                             </li>
-
-                            <li (click)="onDelete(formation.id)">Supprimer</li>
-                            <li (click)="onSend(formation)">Envoyer</li>
+                            <li (click)="onDelete(formation.id); $event.stopPropagation()">Supprimer</li>
+                            <li (click)="onSend(formation); $event.stopPropagation()">Envoyer</li>
                         </ul>
                     </div>
                 </div>
+
                 <div class="card-title">
-                    <h3>{{ formation.titre }}</h3>
+                    <h3 style="display: inline-block; margin-right: 8px;">{{ formation.titre }}</h3>
+                    <span style="color: grey; font-size: 0.85em;">({{ formation.file_type }})</span>
                 </div>
+
                 <div class="card-footer">
                     <p class="creation-date">Créé le: {{ formation.date_creation | date:'dd/MM/yyyy' }}</p>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Preview Overlay -->
+    <div class="preview-overlay" *ngIf="convertedImages.length > 0" (click)="closePreview()">
+
+        <!-- Background click catcher, behind preview-content -->
+        <div class="click-catcher" (click)="closePreview()"></div>
+
+        <div class="preview-content" (click)="$event.stopPropagation()">
+
+            <!-- PDF as images (converted by Poppler) -->
+            <div *ngIf="convertedImages.length > 0" class="image-scroll">
+                <img *ngFor="let img of convertedImages" [src]="img" class="pdf-page-img" />
+            </div>
+
+            <!-- Image (not used when convertedImages is shown) -->
+            <img *ngIf="previewUrl && isImage(previewUrl) && convertedImages.length === 0" [src]="previewUrl"
+                class="preview-img" (contextmenu)="$event.preventDefault()" />
+
+            <!-- Video -->
+            <video *ngIf="previewUrl && isVideo(previewUrl) && convertedImages.length === 0" [src]="previewUrl" controls
+                class="preview-video" (contextmenu)="$event.preventDefault()"></video>
+
+        </div>
+    </div>
+
+
+    <!-- No result message -->
+    <div *ngIf="!hasAnyVisibleFormation() && searchTerm">
+        <p class="no-results">Aucune formation trouvée pour "{{ searchTerm }}"</p>
+    </div>

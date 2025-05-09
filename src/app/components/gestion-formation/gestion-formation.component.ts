@@ -11,6 +11,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { renderAsync } from 'docx-preview';
+declare const pdfjsLib: any;
 @Component({
   selector: 'app-gestion-formation',
   standalone: true,
@@ -32,6 +35,10 @@ export class GestionFormationComponent {
   departements: any[] = [];
   formationModules: any[] = [];
   formationDepartements: any[] = [];
+  previewImages: string[] = [];
+  convertedImages: string[] = [];
+  showPdfViewer = false;
+  previewUrl: string | null = null;
 
   isEditMode = false;
   editingFormationId: number | null = null;
@@ -42,6 +49,7 @@ export class GestionFormationComponent {
   showEditFormationForm = false;
   selectedFormation: any = { id: null, nom: '', description: '', objectif: '', telechargable: false, module_ids: null, departements: null };
   file: File | null = null; // ✅ Allow both File and null
+  safePreviewUrl: SafeResourceUrl | null = null;
 
   dropdownOpen = false;
   showModuleDropdown = false;
@@ -66,8 +74,9 @@ export class GestionFormationComponent {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
   @ViewChild('dropdownRef') dropdownRef!: ElementRef;
+  @ViewChild('docxContainer') docxContainer!: ElementRef;
 
-  constructor(private formationService: FormationService, private http: HttpClient, private fb: FormBuilder,) {
+  constructor(private formationService: FormationService, private http: HttpClient, private fb: FormBuilder, private sanitizer: DomSanitizer) {
     {
       this.formationForm = this.fb.group({
         titre: [''],
@@ -109,6 +118,9 @@ export class GestionFormationComponent {
     }
   }
 
+  hasAnyVisibleFormation(): boolean {
+    return this.moduleGroups.some(group => this.getPaginatedFormations(group).length > 0);
+  }
 
   onSearchChange() {
     console.log('Search Term:', this.searchTerm);
@@ -232,6 +244,26 @@ export class GestionFormationComponent {
     });
 
     this.showEditFormationForm = true;
+  }
+
+  async renderPdfAsImages(url: string): Promise<void> {
+    this.previewImages = [];
+
+    const pdf = await pdfjsLib.getDocument(url).promise;
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d')!;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      await page.render({ canvasContext: context, viewport }).promise;
+      const img = canvas.toDataURL();
+      this.previewImages.push(img);
+    }
   }
 
 
@@ -374,8 +406,8 @@ export class GestionFormationComponent {
   }
   getPaginatedFormations(group: any): any[] {
     const term = this.searchTerm?.trim().toLowerCase() || '';
-
     let filtered = group.formations;
+
     if (term) {
       filtered = filtered.filter((f: { titre: string; file_type: string; }) =>
         f.titre?.toLowerCase().includes(term) ||
@@ -388,6 +420,33 @@ export class GestionFormationComponent {
 
     return filtered.slice(start, end);
   }
+  isPdf(url: string): boolean {
+    return /\.pdf$/i.test(url);
+  }
+
+  isOffice(url: string): boolean {
+    return /\.(doc|docx|xls|xlsx)$/i.test(url);
+  }
+
+
+
+  isImage(url: string): boolean {
+    return /\.(jpeg|jpg|png|gif)$/i.test(url);
+  }
+
+  isVideo(url: string): boolean {
+    return /\.(mp4|webm|ogg)$/i.test(url);
+  }
+
+  isPdfOrOffice(url: string): boolean {
+    return /\.(pdf|doc|docx|xls|xlsx)$/i.test(url);
+  }
+
+  buildGoogleViewer(url: string): string {
+    return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+  }
+
+
 
 
   getTotalPages(group: any): number[] {
@@ -407,6 +466,114 @@ export class GestionFormationComponent {
   nextPage(group: any): void {
     if (group.currentPage < this.getTotalPages(group).length) {
       group.currentPage++;
+    }
+  }
+
+  closePreview(): void {
+    this.previewUrl = null;
+    this.convertedImages = [];
+  }
+
+
+
+
+  viewPdfAsImages(formation: any): void {
+    console.log('🧾 Start converting PDF for formation ID:', formation.id);
+    this.convertedImages = [];
+
+    this.formationService.getPdfImagesById(formation.id).subscribe({
+      next: (res) => {
+        console.log('🖼 PDF conversion success:', res);
+        this.convertedImages = res.images.map(url => `http://localhost:3000${url}`);
+      },
+      error: (err) => {
+        console.error('❌ PDF conversion failed:', err);
+        alert('Impossible de charger le document PDF.');
+      }
+    });
+  }
+  openFormationFile(formation: any): void {
+    const fileUrl = `http://localhost:3000/secure-file/${formation.id}`;
+    const fileType = (formation.file_type || '').toLowerCase();
+
+    // Always open file directly in new tab — let browser decide how to render
+    window.open(fileUrl, '_blank');
+  }
+
+  previewFormationFile(formation: any): void {
+    const fileUrl = `http://localhost:3000/secure-file/${formation.id}`;
+    const fileType = (formation.file_type || '').toLowerCase();
+
+    this.previewUrl = fileUrl;
+    this.convertedImages = [];
+
+    if (fileType === 'pdf') {
+      this.viewPdfAsImages(formation); // Poppler handles both doc and pdf (after conversion)
+      return;
+    }
+    if (formation.file_type === 'docx') {
+      this.previewDocxFromUrl(`http://localhost:3000/${formation.piece_jointe.replace(/^\//, '')}`);
+    }
+
+    // ✅ Force all images to open in new tab
+    if (fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png' || fileType === 'gif' || fileType === 'webp') {
+      console.log("🖼 Redirecting image to openFormationFile()");
+      this.openFormationFile(formation);
+      return;
+    }
+
+    if (this.isVideo(fileUrl)) {
+      this.safePreviewUrl = this.sanitizer.bypassSecurityTrustResourceUrl(fileUrl);
+      return;
+    }
+
+  }
+
+  async previewDocxFromUrl(url: string) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const blob = await response.blob();
+
+      // ✅ Open a new window
+      const newWindow = window.open('', '_blank');
+      if (!newWindow) {
+        alert('Le popup a été bloqué. Veuillez autoriser les fenêtres contextuelles.');
+        return;
+      }
+
+      // ✅ Inject basic HTML structure
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>Prévisualisation Word</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              .docx-container { max-width: 800px; margin: auto; }
+            </style>
+          </head>
+          <body>
+            <div class="docx-container" id="docxContainer">Chargement...</div>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+
+      // ✅ Wait for the DOM to be available
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const container = newWindow.document.getElementById('docxContainer');
+      if (!container) throw new Error('Container not found in new window');
+
+      container.innerHTML = ''; // clear placeholder
+
+      // ✅ Render the .docx content
+      await renderAsync(blob, container, undefined);
+
+    } catch (err: any) {
+      console.error("❌ Error rendering DOCX:", err);
+      alert(`Erreur lors du rendu du fichier DOCX: ${err.message || err}`);
     }
   }
 

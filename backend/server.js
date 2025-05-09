@@ -12,7 +12,8 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
-
+const pdf = require('pdf-poppler');
+const { exec } = require('child_process');
 var formidable = require('formidable');
 const router = express.Router(); // ✅ Define router before using it
 app.use(cors());
@@ -1409,5 +1410,241 @@ app.post('/api/formation_departement', async (req, res) => {
     } catch (err) {
         console.error("❌ ERREUR formation_departement:", err);
         res.status(500).json({ error: err.message });
+    }
+});
+app.get('/uploads/:filename', (req, res) => {
+    const filePath = path.join(__dirname, 'uploads', req.params.filename);
+    const fileExtension = path.extname(filePath).toLowerCase();
+
+    // Only allow inline viewing for supported types (like PDFs)
+    const mimeTypes = {
+        '.pdf': 'application/pdf',
+        '.mp4': 'video/mp4',
+        '.mov': 'video/quicktime',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.xls': 'application/vnd.ms-excel',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+
+    const contentType = mimeTypes[fileExtension] || 'application/octet-stream';
+
+    if (!contentType) {
+        return res.status(415).send('Unsupported file type');
+    }
+    // 👇 Force inline viewing — especially for PDF
+    if (fileExtension === '.pdf') {
+        res.setHeader('Content-Disposition', `inline; filename="${req.params.filename}"`);
+    }
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${req.params.filename}"`);
+    res.sendFile(filePath);
+});
+
+app.get('/convert-from-db/:id', async (req, res) => {
+    const formationId = req.params.id;
+    console.log(`📥 Converting PDF for formation ID: ${formationId}`);
+
+    try {
+        const request = new sql.Request();
+        request.input('id', sql.Int, formationId);
+
+        const result = await request.query(`
+        SELECT piece_jointe FROM formation WHERE id = @id
+      `);
+
+        const record = result.recordset[0];
+        if (!record || !record.piece_jointe) {
+            console.log('❌ No piece_jointe found in DB');
+            return res.status(404).send('PDF path not found in DB.');
+        }
+
+        const relativePath = record.piece_jointe.startsWith('/')
+            ? record.piece_jointe.slice(1)
+            : record.piece_jointe;
+
+        const pdfPath = path.join(__dirname, relativePath);
+        console.log(`🧭 Full PDF path resolved: ${pdfPath}`);
+
+        if (!fs.existsSync(pdfPath)) {
+            console.log('❌ File does not exist on disk:', pdfPath);
+            return res.status(404).send('PDF file not found on disk.');
+        }
+
+        const outputDir = path.join(__dirname, 'converted', `formation_${formationId}`);
+        fs.mkdirSync(outputDir, { recursive: true });
+
+        console.log('🔧 Starting conversion...');
+        await pdf.convert(pdfPath, {
+            format: 'jpeg',
+            out_dir: outputDir,
+            out_prefix: 'page',
+            page: null
+        });
+
+
+        const images = fs.readdirSync(outputDir)
+            .filter(f => f.endsWith('.jpg'))
+            .map(f => `/converted/formation_${formationId}/${f}`);
+
+        console.log('✅ Conversion complete. Images:', images);
+        res.json({ images });
+
+    } catch (err) {
+        console.error('❌ Error during PDF conversion:', err);
+        res.status(500).send('Failed to convert PDF from path.');
+    }
+});
+
+// Serve converted images
+app.use('/converted', express.static(path.join(__dirname, 'converted')));
+app.get('/secure-file/:id', async (req, res) => {
+    const formationId = req.params.id;
+
+    try {
+        const pool = await poolPromise;
+        const request = pool.request();
+        request.input('id', sql.Int, formationId);
+
+        const result = await request.query(`
+        SELECT piece_jointe, telechargable FROM formation WHERE id = @id
+      `);
+
+        const formation = result.recordset[0];
+        if (!formation || !formation.piece_jointe) {
+            return res.status(404).send('Fichier non trouvé.');
+        }
+
+        const relativePath = formation.piece_jointe.startsWith('/')
+            ? formation.piece_jointe.slice(1)
+            : formation.piece_jointe;
+
+        const filePath = path.join(__dirname, relativePath);
+        const fileName = path.basename(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+
+        const mimeTypes = {
+            '.pdf': 'application/pdf',
+            '.mp4': 'video/mp4',
+            '.mov': 'video/quicktime',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.xls': 'application/vnd.ms-excel',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        };
+
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+
+        if (formation.telechargable) {
+            // 👇 Send inline for preview (don't force download)
+            res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+            res.sendFile(filePath);
+        } else {
+            res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+            res.sendFile(filePath);
+        }
+
+    } catch (err) {
+        console.error('❌ Error:', err);
+        res.status(500).send('Erreur serveur.');
+    }
+});
+
+app.get('/convert-from-db/:id', async (req, res) => {
+    const formationId = req.params.id;
+    const outputDir = path.join(__dirname, 'converted', `formation_${formationId}`);
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('id', sql.Int, formationId)
+            .query(`SELECT piece_jointe, file_type FROM formation WHERE id = @id`);
+
+        const formation = result.recordset[0];
+        if (!formation?.piece_jointe) {
+            return res.status(404).json({ error: 'Fichier non trouvé.' });
+        }
+
+        const filePath = path.join(__dirname, formation.piece_jointe.replace(/^\//, ''));
+        const ext = path.extname(filePath).toLowerCase();
+        let pdfPath = filePath;
+
+        console.log("📥 Original file:", filePath);
+
+        // ✅ Convert DOC/DOCX to PDF using LibreOffice
+        if (ext === '.doc' || ext === '.docx') {
+            const tempDir = path.dirname(filePath);
+            const pdfName = path.basename(filePath, path.extname(filePath)) + '.pdf';
+            const targetPdf = path.join(tempDir, pdfName);
+            const libreOfficePath = `"C:\\Program Files\\LibreOffice\\program\\soffice.exe"`;
+
+            await new Promise((resolve, reject) => {
+                const command = `${libreOfficePath} --headless --convert-to pdf "${filePath}" --outdir "${tempDir}"`;
+                console.log("🛠️ Running:", command);
+
+                exec(command, (err, stdout, stderr) => {
+                    console.log("📤 LibreOffice stdout:", stdout);
+                    console.error("📤 LibreOffice stderr:", stderr);
+                    console.log("📁 Expecting PDF at:", targetPdf);
+
+                    if (err) {
+                        console.error('❌ LibreOffice conversion error:', err);
+                        return reject(err);
+                    }
+
+                    // Confirm the .pdf actually exists
+                    if (!fs.existsSync(targetPdf)) {
+                        console.error("❌ PDF NOT FOUND after conversion:", targetPdf);
+                        return reject(new Error("PDF not created."));
+                    }
+
+                    console.log("✅ PDF successfully created:", targetPdf);
+
+                    // ✅ CRITICAL: Set the correct path for Poppler to use
+                    pdfPath = targetPdf;
+                    resolve();
+                });
+            });
+        }
+
+        // ✅ Ensure PDF exists
+        if (!fs.existsSync(pdfPath) || path.extname(pdfPath).toLowerCase() !== '.pdf') {
+            console.error('❌ Not a valid PDF file:', pdfPath);
+            return res.status(500).json({ error: 'PDF conversion failed. No valid PDF found.' });
+        }
+
+        // ✅ Convert PDF to JPG using Poppler
+        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+        console.log("🖼 Converting PDF to images:", pdfPath);
+        const converter = new PdfConverter(pdfPath);
+        await converter.convert(outputDir, {
+            format: 'jpeg',
+            out_prefix: 'page',
+            page: null
+        });
+
+        const images = fs.readdirSync(outputDir)
+            .filter(f => f.endsWith('.jpg'))
+            .map(f => `/converted/formation_${formationId}/${f}`);
+
+        console.log("✅ Images generated:", images);
+        res.json({ images });
+
+    } catch (err) {
+        console.error('❌ Final error during conversion:', err);
+        res.status(500).json({
+            error: 'Erreur serveur lors de la conversion.',
+            message: err.message
+        });
     }
 });
