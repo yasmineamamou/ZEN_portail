@@ -4,9 +4,9 @@
 
     </div>
     <div class="user-section">
-        <i class="fa-solid fa-user"></i> Admin
+        <i class="fa-solid fa-user"></i> {{ userRole }}
         <i class="fa fa-bell" aria-hidden="true"></i>
-        <button>Logout</button>
+        <button (click)="logout()">Logout</button>
 
     </div>
 </header>

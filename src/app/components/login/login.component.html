@@ -1,9 +1,11 @@
-<div>
-    <h2>Login</h2>
-    <form (submit)="onSubmit()">
-        <input type="email" [(ngModel)]="email" name="email" required placeholder="Email">
-        <input type="password" [(ngModel)]="password" name="password" required placeholder="Password">
-        <button type="submit">Login</button>
+<div class="login-container">
+    <h2>Connexion</h2>
+    <form (submit)="onLogin(); $event.preventDefault()">
+        <label>Email:</label>
+        <input type="email" [(ngModel)]="email" name="email" required />
+        <label>Mot de passe:</label>
+        <input type="password" [(ngModel)]="password" name="password" required />
+        <button type="submit">Se connecter</button>
+        <div *ngIf="error" class="error">{{ error }}</div>
     </form>
-    <div *ngIf="error">{{ error }}</div>
 </div>

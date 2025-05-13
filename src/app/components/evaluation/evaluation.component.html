@@ -1,0 +1,178 @@
+<div class="evaluation-section">
+    <div class="actions">
+        <!-- Add Evaluation Button -->
+        <button class="add-formation-btn" (click)="showAddEvaluationForm = true">
+            + AJOUTER ÉVALUATION
+        </button>
+
+        <!-- Search Bar -->
+        <div class="search-container">
+            <input type="text" placeholder="Rechercher..." [(ngModel)]="searchTerm" (input)="onSearchChange()"
+                class="search-input" />
+        </div>
+
+        <!-- Filter by Département -->
+        <select [(ngModel)]="selectedDepartement" (change)="onDepartementFilterChange()" class="filter">
+            <option value="">Filtrer par département</option>
+            <option *ngFor="let d of departements" [value]="d.id">{{ d.nom }}</option>
+        </select>
+    </div>
+
+
+    <div class="formation-list">
+        <div class="formation-card" *ngFor="let evaluation of evaluations"
+            (click)="evaluation.telechargable ? openEvaluationFile(evaluation) : previewEvaluationFile(evaluation)"
+            style="cursor: pointer;">
+
+            <div class="card-content">
+                <div class="card-header">
+                    <div class="menu-button" (click)="toggleEvaluationMenu(evaluation.id); $event.stopPropagation()">
+                        &#8942;
+                        <ul *ngIf="openEvalMenus[evaluation.id]" class="menu-options">
+                            <li (click)="onEditEvaluation(evaluation); $event.stopPropagation()">Modifier</li>
+                            <li (click)="onDeleteEvaluation(evaluation.id); $event.stopPropagation()">Supprimer</li>
+                            <li (click)="onSendEvaluation(evaluation); $event.stopPropagation()">Envoyer</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card-title">
+                    <h3 style="display: inline-block; margin-right: 8px;">{{ evaluation.titre }}</h3>
+                    <span style="color: grey; font-size: 0.85em;">({{ evaluation.file_type }})</span>
+                </div>
+
+                <div class="card-footer">
+                    <p class="creation-date">Créé le: {{ evaluation.date_creation | date:'dd/MM/yyyy' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div *ngIf="showAddEvaluationForm" class="full-page-overlay" (click)="showAddEvaluationForm = false">
+    <div class="poste-form" (click)="$event.stopPropagation()">
+        <div class="stepper">
+            <div class="step active">
+                <div class="step-circle">1</div>
+                <div class="step-label">Nom Évaluation</div>
+            </div>
+            <div class="step">
+                <div class="step-circle">2</div>
+                <div class="step-label">Ajouter Questions</div>
+            </div>
+            <div class="step">
+                <div class="step-circle">3</div>
+                <div class="step-label">Correction</div>
+            </div>
+            <div class="step">
+                <div class="step-circle">4</div>
+                <div class="step-label">Validation</div>
+            </div>
+        </div>
+
+        <h2 class="form-title">Nouvelle Évaluation:</h2>
+
+        <form [formGroup]="evaluationForm" (ngSubmit)="onSubmit()" class="evaluation-form">
+
+            <div class="row-container">
+                <div class="half">
+                    <label for="titre">Titre*</label>
+                    <input formControlName="titre" id="titre" type="text" required />
+                    <div *ngIf="evaluationForm.get('titre')?.invalid && evaluationForm.get('titre')?.touched">
+                        <small style="color: red;">Titre est requis</small>
+                    </div>
+
+                </div>
+                <div class="half">
+                    <label>Thématique*</label>
+                    <div class="mat-select-style">
+                        <div class="custom-dropdown-wrapper" (click)="toggleDepartementDropdown()" tabindex="0">
+                            <div class="custom-dropdown-trigger">
+                                <span *ngIf="selectedDepartements.length === 0">Sélectionner les départements</span>
+                                <span *ngIf="selectedDepartements.length > 0">{{ selectedDepartements.length }}
+                                    sélectionné(s)</span>
+                                <span class="dropdown-icon">▾</span>
+                            </div>
+                            <div class="custom-dropdown-content" *ngIf="showDepartementDropdown">
+                                <label *ngFor="let d of departements" class="liste">
+                                    <input type="checkbox" [checked]="selectedDepartements.includes(d.id)"
+                                        (click)="$event.stopPropagation()" (change)="onDepartementCheckChange(d.id)" />
+                                    {{ d.nom }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row-container">
+                <div class="half">
+                    <div class="custom-autocomplete-container">
+                        <label>Type d'évaluation*</label>
+                        <input type="text" [value]="evaluationForm.get('type_evaluation')?.value"
+                            (input)="onEvaluationTypeInput($event)" (blur)="onBlurEvaluationType()"
+                            (focus)="showEvaluationTypeDropdown = true" placeholder="Saisir ou sélectionner"
+                            class="custom-autocomplete-input" />
+
+                        <!-- Dropdown -->
+                        <div class="custom-autocomplete-dropdown" *ngIf="showEvaluationTypeDropdown">
+                            <div *ngFor="let option of filteredEvaluationTypes" (click)="selectEvaluationType(option)"
+                                class="custom-autocomplete-option">
+                                {{ option }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="half">
+                    <label>Associé à la formation</label>
+                    <div class="mat-select-style">
+                        <div class="custom-dropdown-wrapper" (click)="toggleFormationDropdown()" tabindex="0">
+                            <div class="custom-dropdown-trigger">
+                                <span *ngIf="selectedFormations.length === 0">Sélectionner les formations</span>
+                                <span *ngIf="selectedFormations.length > 0">{{ selectedFormations.length }}
+                                    sélectionnée(s)</span>
+                                <span class="dropdown-icon">▾</span>
+                            </div>
+                            <div class="custom-dropdown-content" *ngIf="showFormationDropdown">
+                                <label *ngFor="let f of formations" class="liste">
+                                    <input type="checkbox" [checked]="selectedFormations.includes(f.id)"
+                                        (click)="$event.stopPropagation()" (change)="onFormationCheckChange(f.id)" />
+                                    {{ f.titre }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="half">
+                <label for="duree">Durée (minutes)*</label>
+                <input type="number" formControlName="duree" id="duree" min="1" required />
+            </div>
+
+            <div class="radio-group">
+                <label>Cette évaluation est associée à un autre test :</label>
+                <label><input type="radio" [value]="true" formControlName="autre_test" /> OUI</label>
+                <label><input type="radio" [value]="false" formControlName="autre_test" /> NON</label>
+            </div>
+
+            <div *ngIf="showParentSelector">
+                <label>Liste des tests</label>
+                <select formControlName="parent_evaluation_id">
+                    <option *ngFor="let ev of evaluations" [value]="ev.id">{{ ev.titre }}</option>
+                </select>
+            </div>
+
+
+
+
+            <div class="question-type-group">
+                <label>Type de question *</label>
+                <label><input type="radio" value="TEXT" formControlName="type_question" /> TEXT</label>
+                <label><input type="radio" value="QCM" formControlName="type_question" /> QCM</label>
+                <label><input type="radio" value="YESNO" formControlName="type_question" /> YES/NO</label>
+            </div>
+
+            <button type="submit">SUIVANT</button>
+        </form>
+    </div>
+</div>

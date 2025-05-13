@@ -8,13 +8,18 @@ import { Router, RouterModule } from '@angular/router';
   styleUrl: './header.component.css'
 })
 export class HeaderComponent {
-  constructor(private router: Router, private authService: AuthService) { }
-
+  constructor(private router: Router, private auth: AuthService) { }
   navigateToDashboard() {
-    this.router.navigate(['/']); // ✅ Navigate to DashboardComponent (path: '')
+    this.router.navigate(['/dashboard']);
   }
+
   logout() {
-    this.authService.logout();
+    this.auth.logout();
+    this.router.navigate(['/login']);
+  }
+
+  get userRole(): string | null {
+    return this.auth.getRole();
   }
 
 }

@@ -17,6 +17,7 @@ const { exec } = require('child_process');
 var formidable = require('formidable');
 const router = express.Router(); // ✅ Define router before using it
 app.use(cors());
+const secretKey = 'yourSecretKey';
 
 app.use(bodyParser.json());
 const JWT_SECRET = 'your_jwt_secret_key_here'; // Keep this secret and safe
@@ -41,9 +42,32 @@ const dbConfig = {
     },
     port: 1433 // Ensure SQL Server is running on this port
 };
+const pool = new sql.ConnectionPool(dbConfig);
+const poolConnect = pool.connect();
 sql.connect(dbConfig)
     .then(() => console.log('Connected to SQL Server'))
     .catch(err => console.error('Database connection failed', err));
+
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.sendStatus(401); // No token
+
+    jwt.verify(token, secretKey, (err, user) => {
+        if (err) return res.sendStatus(403); // Invalid token
+        req.user = user; // Attach decoded user
+        next();
+    });
+}
+function authorizeRoles(...allowedRoles) {
+    return (req, res, next) => {
+        if (!req.user || !allowedRoles.includes(req.user.role)) {
+            return res.status(403).json({ message: 'Access denied: insufficient permissions' });
+        }
+        next();
+    };
+}
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -68,307 +92,336 @@ const upload = multer({
     }
 });
 
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-
+app.post('/login', async (req, res) => {
     try {
-        const result = await sql.query`SELECT * FROM users WHERE email = ${email}`;
+        await poolConnect;
+        const { email, password } = req.body;
+        console.log("📩 Email received:", email);
+        console.log("🔑 Password received:", password);
+
+        const request = pool.request();
+        request.input('email', sql.NVarChar, email);
+        const result = await request.query(`SELECT * FROM users WHERE email = @email AND status = 1`);
+
+        if (!result.recordset || result.recordset.length === 0) {
+            console.log("❌ No user found");
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
         const user = result.recordset[0];
+        console.log("✅ User found:", user.email);
+        console.log("📦 Password from DB:", user.password);
 
-        if (!user) return res.status(401).json({ message: 'Invalid email or password' });
+        const match = await bcrypt.compare(password, user.password);
+        console.log("🔍 Password match:", match);
 
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (!validPassword) return res.status(401).json({ message: 'Invalid email or password' });
+        if (!match) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign(
+            { id: user.id, role: user.role, email: user.email },
+            secretKey,
+            { expiresIn: '1h' }
+        );
+
         res.json({ token });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error' });
+        console.error("🔥 Login error:", err);
+        res.status(500).json({ error: err.message });
     }
 });
 
-app.post('/api/upload-photo/:id', (req, res) => {
-    const userId = req.params.id;
-    if (!userId) {
-        return res.status(400).json({ message: "userId ID is required" });
-    }
 
-    const form = new formidable.IncomingForm();
-    form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
-    form.keepExtensions = true;
-
-    form.parse(req, async (err, fields, files) => {
-        if (err) {
-            return res.status(500).json({ message: 'File upload failed', error: err });
+app.post('/api/upload-photo/:id', authenticateToken,
+    authorizeRoles('admin', 'super-admin'), (req, res) => {
+        const userId = req.params.id;
+        if (!userId) {
+            return res.status(400).json({ message: "userId ID is required" });
         }
 
-        console.log("Files received:", files);
+        const form = new formidable.IncomingForm();
+        form.uploadDir = path.join(__dirname, 'uploads'); // Ensure this folder exists
+        form.keepExtensions = true;
 
-        const fileArray = files.file;
-        if (!fileArray || fileArray.length === 0) {
-            return res.status(400).json({ message: "No file uploaded" });
-        }
-
-        const file = fileArray[0]; // Get the uploaded file
-        const originalFileName = file.originalFilename; // ✅ Keep the original name
-        const fileExtension = path.extname(originalFileName); // Extract extension
-        const newFileName = `${userId}_${originalFileName}`; // Use original name with ID
-        const newPath = path.join(form.uploadDir, newFileName);
-        const dbFilePath = `/uploads/${newFileName}`; // Store relative path in DB
-
-        try {
-            // 🔹 Get the old file path from the database
-            const selectQuery = `SELECT profilePicture FROM Users WHERE id = @id`;
-            const request = new sql.Request();
-            request.input('id', sql.Int, userId);
-            const result = await request.query(selectQuery);
-
-            if (result.recordset.length > 0 && result.recordset[0].profilePicture) {
-                const oldFilePath = path.join(__dirname, result.recordset[0].profilePicture);
-                if (fs.existsSync(oldFilePath)) {
-                    fs.unlinkSync(oldFilePath); // Delete old file
-                }
+        form.parse(req, async (err, fields, files) => {
+            if (err) {
+                return res.status(500).json({ message: 'File upload failed', error: err });
             }
 
-            // Move the uploaded file to the correct location
-            fs.rename(file.filepath, newPath, async (err) => {
-                if (err) {
-                    return res.status(500).json({ message: 'Error moving file', error: err });
+            console.log("Files received:", files);
+
+            const fileArray = files.file;
+            if (!fileArray || fileArray.length === 0) {
+                return res.status(400).json({ message: "No file uploaded" });
+            }
+
+            const file = fileArray[0]; // Get the uploaded file
+            const originalFileName = file.originalFilename; // ✅ Keep the original name
+            const fileExtension = path.extname(originalFileName); // Extract extension
+            const newFileName = `${userId}_${originalFileName}`; // Use original name with ID
+            const newPath = path.join(form.uploadDir, newFileName);
+            const dbFilePath = `/uploads/${newFileName}`; // Store relative path in DB
+
+            try {
+                // 🔹 Get the old file path from the database
+                const selectQuery = `SELECT profilePicture FROM Users WHERE id = @id`;
+                const request = new sql.Request();
+                request.input('id', sql.Int, userId);
+                const result = await request.query(selectQuery);
+
+                if (result.recordset.length > 0 && result.recordset[0].profilePicture) {
+                    const oldFilePath = path.join(__dirname, result.recordset[0].profilePicture);
+                    if (fs.existsSync(oldFilePath)) {
+                        fs.unlinkSync(oldFilePath); // Delete old file
+                    }
                 }
 
-                // ✅ Update the database with the original file name
-                const updateQuery = `
+                // Move the uploaded file to the correct location
+                fs.rename(file.filepath, newPath, async (err) => {
+                    if (err) {
+                        return res.status(500).json({ message: 'Error moving file', error: err });
+                    }
+
+                    // ✅ Update the database with the original file name
+                    const updateQuery = `
                     UPDATE Users 
                     SET profilePicture = @profilePicture 
                     WHERE id = @id
                 `;
-                request.input('profilePicture', sql.NVarChar, dbFilePath);
-                await request.query(updateQuery);
+                    request.input('profilePicture', sql.NVarChar, dbFilePath);
+                    await request.query(updateQuery);
 
-                res.status(200).json({
-                    message: 'File uploaded and path updated successfully',
-                    fileName: originalFileName, // ✅ Return the original file name
-                    filePath: dbFilePath
+                    res.status(200).json({
+                        message: 'File uploaded and path updated successfully',
+                        fileName: originalFileName, // ✅ Return the original file name
+                        filePath: dbFilePath
+                    });
                 });
-            });
 
-        } catch (dbErr) {
-            res.status(500).json({ message: "Database update failed", error: dbErr.message });
-        }
+            } catch (dbErr) {
+                res.status(500).json({ message: "Database update failed", error: dbErr.message });
+            }
+        });
     });
-});
 
-app.post('/api/users', async (req, res) => {
-    try {
-        const {
-            name,
-            email,
-            password,
-            societe_id,
-            poste_id,
-            departement_id,
-            status,
-            role
-        } = req.body;
+app.post('/api/users', authenticateToken,
+    authorizeRoles('admin', 'super-admin'), async (req, res) => {
+        try {
+            const {
+                name,
+                email,
+                password,
+                societe_id,
+                poste_id,
+                departement_id,
+                status,
+                role
+            } = req.body;
 
-        const validRoles = ['admin', 'client', 'super-admin'];
-        if (!validRoles.includes(role)) {
-            return res.status(400).json({ message: 'Invalid role' });
-        }
+            const validRoles = ['admin', 'client', 'super-admin'];
+            if (!validRoles.includes(role)) {
+                return res.status(400).json({ message: 'Invalid role' });
+            }
 
-        const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash the password
-        const statusBit = status === 1 ? 1 : 0;
+            const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash the password
+            const statusBit = status === 1 ? 1 : 0;
 
-        const request = new sql.Request();
-        request.input('name', sql.NVarChar, name);
-        request.input('email', sql.NVarChar, email);
-        request.input('password', sql.NVarChar, hashedPassword); // ✅ Store hashed
-        request.input('societe_id', sql.Int, societe_id);
-        request.input('poste_id', sql.Int, poste_id);
-        request.input('departement_id', sql.Int, departement_id);
-        request.input('status', sql.Bit, statusBit);
-        request.input('role', sql.NVarChar, role);
-        request.input('date_creation', sql.DateTime, new Date());
+            const request = new sql.Request();
+            request.input('name', sql.NVarChar, name);
+            request.input('email', sql.NVarChar, email);
+            request.input('password', sql.NVarChar, hashedPassword); // ✅ Store hashed
+            request.input('societe_id', sql.Int, societe_id);
+            request.input('poste_id', sql.Int, poste_id);
+            request.input('departement_id', sql.Int, departement_id);
+            request.input('status', sql.Bit, statusBit);
+            request.input('role', sql.NVarChar, role);
+            request.input('date_creation', sql.DateTime, new Date());
 
-        const query = `
+            const query = `
             INSERT INTO Users (name, email, password, societe_id, poste_id, departement_id, status, date_creation, role)
             OUTPUT INSERTED.id
             VALUES (@name, @email, @password, @societe_id, @poste_id, @departement_id, @status, @date_creation, @role)
         `;
 
-        const result = await request.query(query);
+            const result = await request.query(query);
 
-        if (result.recordset.length > 0) {
-            res.status(201).json({ message: 'User created', userId: result.recordset[0].id });
-        } else {
-            res.status(500).json({ message: 'Insert failed' });
+            if (result.recordset.length > 0) {
+                res.status(201).json({ message: 'User created', userId: result.recordset[0].id });
+            } else {
+                res.status(500).json({ message: 'Insert failed' });
+            }
+
+        } catch (err) {
+            console.error('Create user error:', err);
+            res.status(500).json({ error: err.message });
         }
+    });
 
-    } catch (err) {
-        console.error('Create user error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
+app.post('/api/user_unite', authenticateToken,
+    authorizeRoles('admin', 'super-admin'), async (req, res) => {
+        const { user_id, unite_id } = req.body;
 
-app.post('/api/user_unite', async (req, res) => {
-    const { user_id, unite_id } = req.body;
+        try {
+            let pool = await sql.connect(dbConfig);
 
-    try {
-        let pool = await sql.connect(dbConfig);
+            await pool.request()
+                .input('user_id', sql.Int, user_id)
+                .input('unite_id', sql.Int, unite_id)
+                .query(`INSERT INTO user_unite (user_id, unite_id) VALUES (@user_id, @unite_id)`);
 
-        await pool.request()
-            .input('user_id', sql.Int, user_id)
-            .input('unite_id', sql.Int, unite_id)
-            .query(`INSERT INTO user_unite (user_id, unite_id) VALUES (@user_id, @unite_id)`);
-
-        res.status(201).json({ message: 'User linked to Unite successfully' });
-    } catch (error) {
-        console.error('Error linking user to Unite:', error.message);
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-});
-app.post('/api/user_cube', async (req, res) => {
-    const { user_id, cube_id } = req.body;
-
-    try {
-        let pool = await sql.connect(dbConfig);
-
-        await pool.request()
-            .input('user_id', sql.Int, user_id)
-            .input('cube_id', sql.Int, cube_id)
-            .query(`INSERT INTO user_cube (user_id, cube_id) VALUES (@user_id, @cube_id)`);
-
-        res.status(201).json({ message: 'User linked to Cube successfully' });
-    } catch (error) {
-        console.error('Error linking user to Cube:', error.message);
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-});
-app.get('/api/users', async (req, res) => {
-    try {
-        const pool = await sql.connect(dbConfig);
-
-        // Step 1: Get all users
-        const result = await pool.request().query(`
-            SELECT
-                users.id,
-                users.name,
-                users.email,
-                users.password,
-                users.date_creation, 
-                users.role,
-                users.status,
-                Departement.nom AS departement,
-                Postes.nom AS postes,
-                Societe.nom AS societe
-            FROM users
-            LEFT JOIN Departement ON users.departement_id = Departement.id
-            LEFT JOIN Postes ON users.poste_id = Postes.id
-            LEFT JOIN Societe ON users.societe_id = Societe.id
-        `);
-        console.log('Users Data:', result.recordset); // ✅ Debugging Log
-        res.json(result.recordset);
-    } catch (err) {
-        console.error('Database Error:', err); // ✅ Log error to console
-        res.status(500).json({ error: 'Database error', details: err.message });
-    }
-});
-
-app.delete('/api/users/:ids', async (req, res) => {
-    try {
-        const userIds = req.params.ids.split(',').map(id => parseInt(id.trim())); // Convert to an array of integers
-        if (userIds.some(isNaN)) {
-            return res.status(400).json({ error: "Invalid user ID(s) provided." });
+            res.status(201).json({ message: 'User linked to Unite successfully' });
+        } catch (error) {
+            console.error('Error linking user to Unite:', error.message);
+            res.status(500).json({ message: 'Server error', error: error.message });
         }
+    });
+app.post('/api/user_cube', authenticateToken,
+    authorizeRoles('admin', 'super-admin'), async (req, res) => {
+        const { user_id, cube_id } = req.body;
 
-        await sql.connect(dbConfig);
-        const query = `DELETE FROM Users WHERE id IN (${userIds.join(",")})`;
-        await sql.query(query);
+        try {
+            let pool = await sql.connect(dbConfig);
 
-        res.json({ message: "Users deleted successfully" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+            await pool.request()
+                .input('user_id', sql.Int, user_id)
+                .input('cube_id', sql.Int, cube_id)
+                .query(`INSERT INTO user_cube (user_id, cube_id) VALUES (@user_id, @cube_id)`);
+
+            res.status(201).json({ message: 'User linked to Cube successfully' });
+        } catch (error) {
+            console.error('Error linking user to Cube:', error.message);
+            res.status(500).json({ message: 'Server error', error: error.message });
+        }
+    });
+app.get('/api/users',
+    authenticateToken,
+    authorizeRoles('admin', 'super-admin'),
+    async (req, res) => {
+        try {
+            const pool = await sql.connect(dbConfig);
+            const result = await pool.request().query(`
+        SELECT
+          users.id,
+          users.name,
+          users.email,
+          users.password,
+          users.date_creation,
+          users.role,
+          users.status,
+          Departement.nom AS departement,
+          Postes.nom AS postes,
+          Societe.nom AS societe
+        FROM users
+        LEFT JOIN Departement ON users.departement_id = Departement.id
+        LEFT JOIN Postes ON users.poste_id = Postes.id
+        LEFT JOIN Societe ON users.societe_id = Societe.id
+      `);
+            res.json(result.recordset);
+        } catch (err) {
+            console.error('Database Error:', err);
+            res.status(500).json({ error: 'Database error', details: err.message });
+        }
     }
-});
+);
 
-app.get('/api/users/:id', async (req, res) => {
-    const userId = req.params.id;
+app.delete('/api/users/:ids', authenticateToken,
+    authorizeRoles('admin', 'super-admin'), async (req, res) => {
+        try {
+            const userIds = req.params.ids.split(',').map(id => parseInt(id.trim())); // Convert to an array of integers
+            if (userIds.some(isNaN)) {
+                return res.status(400).json({ error: "Invalid user ID(s) provided." });
+            }
 
-    try {
-        let pool = await sql.connect(dbConfig);
+            await sql.connect(dbConfig);
+            const query = `DELETE FROM Users WHERE id IN (${userIds.join(",")})`;
+            await sql.query(query);
 
-        // Fetch user details
-        let userResult = await pool.request()
-            .input('user_id', sql.Int, userId)
-            .query(`
+            res.json({ message: "Users deleted successfully" });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+app.get('/api/users/:id', authenticateToken,
+    authorizeRoles('admin', 'super-admin'), async (req, res) => {
+        const userId = req.params.id;
+
+        try {
+            let pool = await sql.connect(dbConfig);
+
+            // Fetch user details
+            let userResult = await pool.request()
+                .input('user_id', sql.Int, userId)
+                .query(`
                 SELECT * FROM Users WHERE id = @user_id
             `);
 
-        if (userResult.recordset.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
+            if (userResult.recordset.length === 0) {
+                return res.status(404).json({ message: 'User not found' });
+            }
 
-        let user = userResult.recordset[0];
+            let user = userResult.recordset[0];
 
-        // Fetch associated Unites
-        let unitesResult = await pool.request()
-            .input('user_id', sql.Int, userId)
-            .query(`
+            // Fetch associated Unites
+            let unitesResult = await pool.request()
+                .input('user_id', sql.Int, userId)
+                .query(`
                 SELECT u.id, u.nom, u.description 
                 FROM unites u
                 INNER JOIN user_unite uu ON uu.unite_id = u.id
                 WHERE uu.user_id = @user_id
             `);
 
-        let cubesResult = await pool.request()
-            .input('user_id', sql.Int, userId)
-            .query(`
+            let cubesResult = await pool.request()
+                .input('user_id', sql.Int, userId)
+                .query(`
                 SELECT c.id, c.nom, c.description 
                 FROM cubes c
                 INNER JOIN user_cube uc ON uc.cube_id = c.id
                 WHERE uc.user_id = @user_id
             `);
 
-        user.unites = unitesResult.recordset;
-        user.cubes = cubesResult.recordset;
+            user.unites = unitesResult.recordset;
+            user.cubes = cubesResult.recordset;
 
-        res.status(200).json(user);
-    } catch (error) {
-        console.error('Error fetching user:', error.message);
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-});
-
-app.put('/api/users/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        console.log("Received Update Request for User ID:", id);
-        console.log("Request Body:", req.body);
-        const { name, email, password, societe_id, poste_id, departement_id, status, role, unite_ids, menu_cube_ids } = req.body;
-
-        const validRoles = ['admin', 'client', 'super-admin'];
-        if (!validRoles.includes(role)) {
-            return res.status(400).json({ message: 'Invalid role. Allowed values: admin, client, super-admin' });
+            res.status(200).json(user);
+        } catch (error) {
+            console.error('Error fetching user:', error.message);
+            res.status(500).json({ message: 'Server error', error: error.message });
         }
+    });
 
-        let pool = await sql.connect(dbConfig);
+app.put('/api/users/:id', authenticateToken,
+    authorizeRoles('admin', 'super-admin'), async (req, res) => {
+        try {
+            const { id } = req.params;
+            console.log("Received Update Request for User ID:", id);
+            console.log("Request Body:", req.body);
+            const { name, email, password, societe_id, poste_id, departement_id, status, role, unite_ids, menu_cube_ids } = req.body;
 
-        const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash the password
-        const statusBit = status ? 1 : 0;
+            const validRoles = ['admin', 'client', 'super-admin'];
+            if (!validRoles.includes(role)) {
+                return res.status(400).json({ message: 'Invalid role. Allowed values: admin, client, super-admin' });
+            }
 
-        // 🔹 **1. Update Users Table**
-        await pool.request()
-            .input('id', sql.Int, id)
-            .input('name', sql.NVarChar, name)
-            .input('email', sql.NVarChar, email)
-            .input('password', sql.NVarChar, hashedPassword) // ✅ Store hashed
-            .input('societe_id', sql.Int, societe_id)
-            .input('poste_id', sql.Int, poste_id)
-            .input('departement_id', sql.Int, departement_id)
-            .input('status', sql.Bit, statusBit)
-            .input('role', sql.NVarChar, role)
-            .query(`
+            let pool = await sql.connect(dbConfig);
+
+            const hashedPassword = await bcrypt.hash(password, 10); // ✅ Hash the password
+            const statusBit = status ? 1 : 0;
+
+            // 🔹 **1. Update Users Table**
+            await pool.request()
+                .input('id', sql.Int, id)
+                .input('name', sql.NVarChar, name)
+                .input('email', sql.NVarChar, email)
+                .input('password', sql.NVarChar, hashedPassword) // ✅ Store hashed
+                .input('societe_id', sql.Int, societe_id)
+                .input('poste_id', sql.Int, poste_id)
+                .input('departement_id', sql.Int, departement_id)
+                .input('status', sql.Bit, statusBit)
+                .input('role', sql.NVarChar, role)
+                .query(`
                 UPDATE Users 
                 SET name = @name, email = @email, password = @password, societe_id = @societe_id, 
                     poste_id = @poste_id, departement_id = @departement_id, 
@@ -376,43 +429,43 @@ app.put('/api/users/:id', async (req, res) => {
                 WHERE id = @id
             `);
 
-        // 🔹 **2. Delete Old Unite Associations**
-        await pool.request()
-            .input('user_id', sql.Int, id)
-            .query(`DELETE FROM user_unite WHERE user_id = @user_id`);
+            // 🔹 **2. Delete Old Unite Associations**
+            await pool.request()
+                .input('user_id', sql.Int, id)
+                .query(`DELETE FROM user_unite WHERE user_id = @user_id`);
 
-        // 🔹 **3. Insert New Unite Associations**
-        if (unite_ids && unite_ids.length > 0) {
-            for (let unite_id of unite_ids) {
-                await pool.request()
-                    .input('user_id', sql.Int, id)
-                    .input('unite_id', sql.Int, unite_id)
-                    .query(`INSERT INTO user_unite (user_id, unite_id) VALUES (@user_id, @unite_id)`);
+            // 🔹 **3. Insert New Unite Associations**
+            if (unite_ids && unite_ids.length > 0) {
+                for (let unite_id of unite_ids) {
+                    await pool.request()
+                        .input('user_id', sql.Int, id)
+                        .input('unite_id', sql.Int, unite_id)
+                        .query(`INSERT INTO user_unite (user_id, unite_id) VALUES (@user_id, @unite_id)`);
+                }
             }
-        }
 
-        // 🔹 **4. Delete Old Cube Associations**
-        await pool.request()
-            .input('user_id', sql.Int, id)
-            .query(`DELETE FROM user_cube WHERE user_id = @user_id`);
+            // 🔹 **4. Delete Old Cube Associations**
+            await pool.request()
+                .input('user_id', sql.Int, id)
+                .query(`DELETE FROM user_cube WHERE user_id = @user_id`);
 
-        // 🔹 **5. Insert New Cube Associations**
-        if (menu_cube_ids && menu_cube_ids.length > 0) {
-            for (let cube_id of menu_cube_ids) {
-                await pool.request()
-                    .input('user_id', sql.Int, id)
-                    .input('cube_id', sql.Int, cube_id)
-                    .query(`INSERT INTO user_cube (user_id, cube_id) VALUES (@user_id, @cube_id)`);
+            // 🔹 **5. Insert New Cube Associations**
+            if (menu_cube_ids && menu_cube_ids.length > 0) {
+                for (let cube_id of menu_cube_ids) {
+                    await pool.request()
+                        .input('user_id', sql.Int, id)
+                        .input('cube_id', sql.Int, cube_id)
+                        .query(`INSERT INTO user_cube (user_id, cube_id) VALUES (@user_id, @cube_id)`);
+                }
             }
+
+            res.json({ message: 'User and related tables updated successfully' });
+
+        } catch (err) {
+            console.error("Update Error:", err);
+            res.status(500).json({ error: 'Database error', details: err.message });
         }
-
-        res.json({ message: 'User and related tables updated successfully' });
-
-    } catch (err) {
-        console.error("Update Error:", err);
-        res.status(500).json({ error: 'Database error', details: err.message });
-    }
-});
+    });
 
 app.get('/api/societes', async (req, res) => {
     try {
@@ -1178,8 +1231,6 @@ app.post('/api/upload-formation/:id', (req, res) => {
         });
     });
 });
-
-
 app.post('/api/formations', async (req, res) => {
     try {
         const { titre, description, objectif, piece_jointe, telechargable, modules, departements } = req.body;
@@ -1337,7 +1388,6 @@ app.put('/api/formations/:id', async (req, res) => {
 });
 
 const { poolPromise } = require('./db');
-
 
 app.get('/api/formation_module', async (req, res) => {
     try {
@@ -1499,8 +1549,6 @@ app.get('/convert-from-db/:id', async (req, res) => {
         res.status(500).send('Failed to convert PDF from path.');
     }
 });
-
-// Serve converted images
 app.use('/converted', express.static(path.join(__dirname, 'converted')));
 app.get('/secure-file/:id', async (req, res) => {
     const formationId = req.params.id;
@@ -1647,4 +1695,140 @@ app.get('/convert-from-db/:id', async (req, res) => {
             message: err.message
         });
     }
+});
+
+app.get('/api/evaluation', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM evaluation');
+        res.send(result.recordset);
+    } catch (err) {
+        console.error('Error fetching evaluations:', err.message);
+        res.status(500).send({ error: err.message });
+    }
+});
+app.get('/api/evaluation/:id', async (req, res) => {
+    try {
+        await poolConnect;
+        const id = req.params.id;
+
+        const evaluation = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT * FROM evaluation WHERE id = @id`);
+
+        const formations = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT f.* FROM formation f 
+              JOIN evaluation_formation ef ON ef.formation_id = f.id 
+              WHERE ef.evaluation_id = @id`);
+
+        const departements = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT d.* FROM departement d 
+              JOIN evaluation_departement ed ON ed.departement_id = d.id 
+              WHERE ed.evaluation_id = @id`);
+
+        const questions = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT * FROM question WHERE evaluation_id = @id`);
+
+        res.json({
+            evaluation: evaluation.recordset[0],
+            formations: formations.recordset,
+            departements: departements.recordset,
+            questions: questions.recordset
+        });
+    } catch (err) {
+        console.error('GET /api/evaluation/:id error:', err);
+        res.status(500).send('Server error');
+    }
+});
+app.post('/api/evaluation', async (req, res) => {
+    const {
+        titre,
+        type_evaluation,
+        type_question,
+        duree,
+        parent_evaluation_id,
+        formation_ids,
+        departement_ids,
+        questions
+    } = req.body;
+
+    try {
+        const pool = await poolPromise; // ✅ Replace this
+
+        const result = await pool.request()
+            .input('titre', sql.NVarChar, titre)
+            .input('type_evaluation', sql.NVarChar, type_evaluation)
+            .input('type_question', sql.NVarChar, type_question)
+            .input('duree', sql.Int, duree)
+            .input('parent', sql.Int, parent_evaluation_id || null)
+            .query(`
+        INSERT INTO evaluation (titre, type_evaluation, type_question, duree, parent_evaluation_id)
+        OUTPUT INSERTED.id
+        VALUES (@titre, @type_evaluation, @type_question, @duree, @parent)
+      `);
+
+        const evaluationId = result.recordset[0].id;
+
+        for (const fid of formation_ids || []) {
+            await pool.request()
+                .input('eid', sql.Int, evaluationId)
+                .input('fid', sql.Int, fid)
+                .query(`INSERT INTO evaluation_formation (evaluation_id, formation_id) VALUES (@eid, @fid)`);
+        }
+
+        for (const did of departement_ids || []) {
+            await pool.request()
+                .input('eid', sql.Int, evaluationId)
+                .input('did', sql.Int, did)
+                .query(`INSERT INTO evaluation_departement (evaluation_id, departement_id) VALUES (@eid, @did)`);
+        }
+
+        for (const q of questions || []) {
+            const qResult = await pool.request()
+                .input('eid', sql.Int, evaluationId)
+                .input('texte', sql.NVarChar, q.texte)
+                .input('description', sql.NVarChar, q.description || null)
+                .input('type', sql.NVarChar, q.type_question)
+                .query(`
+          INSERT INTO question (evaluation_id, texte, description, type_question)
+          OUTPUT INSERTED.id
+          VALUES (@eid, @texte, @description, @type)
+        `);
+
+            const questionId = qResult.recordset[0].id;
+
+            for (const opt of q.options || []) {
+                await pool.request()
+                    .input('qid', sql.Int, questionId)
+                    .input('texte', sql.NVarChar, opt.texte)
+                    .input('correct', sql.Bit, opt.is_correct)
+                    .query(`INSERT INTO question_option (question_id, texte, is_correct) VALUES (@qid, @texte, @correct)`);
+            }
+        }
+
+        res.status(201).json({ message: 'Evaluation created', id: evaluationId });
+
+    } catch (err) {
+        console.error('POST /api/evaluation error:', err);
+        res.status(500).send('Server error');
+    }
+});
+app.get('/api/evaluation-types', async (req, res) => {
+    try {
+        const pool = await sql.connect(dbConfig);
+        const result = await pool.request().query(`SELECT DISTINCT type_evaluation FROM evaluation`);
+        const types = result.recordset.map(row => row.type_evaluation);
+        res.json(types);
+    } catch (err) {
+        console.error("❌ Failed to get types:", err);
+        res.status(500).send('Server error');
+    }
+});
+app.post('/api/evaluation-types', (req, res) => {
+    const { type } = req.body;
+    console.log("🔄 Type POST received (ignored because saved via evaluation):", type);
+    res.status(200).json({ message: "Type received, already handled elsewhere." });
 });

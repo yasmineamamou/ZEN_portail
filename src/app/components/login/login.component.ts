@@ -1,8 +1,10 @@
 import { Component } from '@angular/core';
 import { AuthService } from '../../services/auth.service';
 import { Router } from '@angular/router';
-import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { jwtDecode } from 'jwt-decode';
+
 @Component({
   selector: 'app-login',
   imports: [FormsModule, CommonModule],
@@ -10,27 +12,38 @@ import { CommonModule } from '@angular/common';
   styleUrl: './login.component.css'
 })
 export class LoginComponent {
-  email = '';
-  password = '';
-  error = '';
+  loginForm: FormGroup;
+  email: string = '';
+  password: string = '';
+  error: string | null = null;
 
-  constructor(private authService: AuthService, private router: Router) { }
-  ngOnInit() {
-    if (this.authService.isLoggedIn()) {
-      this.router.navigate(['/dashboard']);
-    }
+  constructor(private fb: FormBuilder, private authService: AuthService, private router: Router) {
+    this.loginForm = this.fb.group({
+      email: [''],
+      password: ['']
+    });
   }
-  onSubmit() {
-    console.log('Attempting login', this.email);
-    this.authService.login(this.email, this.password).subscribe({
-      next: (res) => {
-        console.log('Login successful:', res);
-        localStorage.setItem('token', res.token);
-        this.router.navigate(['/dashboard']);
+  onLogin() {
+    const credentials = {
+      email: this.email,
+      password: this.password
+    };
+
+    this.authService.login(credentials).subscribe({
+      next: (res: any) => {
+        const token = res.token;
+        localStorage.setItem('token', token);
+
+        const decoded: any = jwtDecode(token);
+        const role = decoded.role;
+        localStorage.setItem('role', role);
+
+        this.error = null;
+        this.router.navigate(['/dashboard']); // ✅ or any route you want
       },
       error: (err) => {
-        console.error('Login failed:', err);
-        this.error = err.error?.message || 'Login error';
+        this.error = 'Email ou mot de passe incorrect';
+        console.error('❌ Login failed:', err);
       }
     });
   }

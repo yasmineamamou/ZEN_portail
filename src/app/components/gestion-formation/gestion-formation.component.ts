@@ -446,9 +446,6 @@ export class GestionFormationComponent {
     return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
   }
 
-
-
-
   getTotalPages(group: any): number[] {
     const total = Math.ceil(group.formations.length / group.itemsPerPage);
     return Array.from({ length: total }, (_, i) => i + 1);
@@ -473,9 +470,6 @@ export class GestionFormationComponent {
     this.previewUrl = null;
     this.convertedImages = [];
   }
-
-
-
 
   viewPdfAsImages(formation: any): void {
     console.log('🧾 Start converting PDF for formation ID:', formation.id);
