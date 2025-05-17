@@ -35,5 +35,15 @@ export class EvaluationService {
   addEvaluationType(type: string): Observable<any> {
     return this.http.post('http://localhost:3000/api/evaluation-types', { type }); // POST new type
   }
+  createQuestion(question: any) {
+    return this.http.post('http://localhost:3000/api/questions', question);
+  }
+
+  createOption(option: any) {
+    return this.http.post('http://localhost:3000/api/question-options', option);
+  }
+  getEvaluationById(id: number) {
+    return this.http.get<any>(`http://localhost:3000/api/evaluation/${id}`);
+  }
 
 }

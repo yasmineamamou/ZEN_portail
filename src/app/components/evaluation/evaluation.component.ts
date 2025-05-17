@@ -10,13 +10,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTableModule } from '@angular/material/table';
-import { isPlatformBrowser } from '@angular/common';
 import { Observable, of } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-
+import { Router, RouterModule } from '@angular/router';
 @Component({
   selector: 'app-evaluation',
   imports: [CommonModule,
@@ -27,7 +26,7 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
     MatAutocompleteModule,
     MatSelectModule,
     MatSortModule,
-    MatIconModule,
+    MatIconModule, RouterModule,
     MatButtonModule,
     MatCheckboxModule,],
   templateUrl: './evaluation.component.html',
@@ -56,7 +55,7 @@ export class EvaluationComponent implements OnInit {
   filteredTypes!: Observable<string[]>;
   selectedType: string = '';
 
-  constructor(private fb: FormBuilder, private evalService: EvaluationService, @Inject(PLATFORM_ID) private platformId: Object) { }
+  constructor(private fb: FormBuilder, private evalService: EvaluationService, private router: Router) { }
 
   ngOnInit(): void {
     this.loadDropdowns();
@@ -116,16 +115,16 @@ export class EvaluationComponent implements OnInit {
   }
 
   onSubmit() {
-    console.log("🚀 Submit clicked", this.evaluationForm.value); // <-- debug
     if (this.evaluationForm.valid) {
       const formValue = this.evaluationForm.value;
       formValue.parent_evaluation_id = formValue.autre_test ? formValue.parent_evaluation_id : null;
-      this.evalService.createEvaluation(formValue).subscribe({
-        next: () => alert('✅ Evaluation créée !'),
-        error: err => console.error('Error creating evaluation', err)
+
+      this.evalService.createEvaluation(formValue).subscribe((res: any) => {
+        const newEvalId = res.id; // returned by backend
+        this.router.navigate(['/evaluation', newEvalId, 'questions']);
       });
     } else {
-      console.warn("⚠️ Form invalid", this.evaluationForm.errors);
+      alert("Formulaire invalide");
     }
   }
 

@@ -14,6 +14,7 @@ import { GestionFormationComponent } from './components/gestion-formation/gestio
 import { EvaluationComponent } from './components/evaluation/evaluation.component';
 import { LoginComponent } from './components/login/login.component';
 import { AuthGuard } from './guards/auth.guard';
+import { EvaluationQuestionComponent } from './components/evaluation-question/evaluation-question.component';
 
 export const routes: Routes = [
     {
@@ -67,5 +68,6 @@ export const routes: Routes = [
     { path: '', redirectTo: 'login', pathMatch: 'full' },
 
     { path: 'unauthorized', redirectTo: 'login', pathMatch: 'full' },
+    { path: 'evaluation/:id/questions', component: EvaluationQuestionComponent, canActivate: [AuthGuard], data: { role: 'admin' } }
 
 ];

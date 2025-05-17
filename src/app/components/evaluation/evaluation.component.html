@@ -77,10 +77,6 @@
                 <div class="half">
                     <label for="titre">Titre*</label>
                     <input formControlName="titre" id="titre" type="text" required />
-                    <div *ngIf="evaluationForm.get('titre')?.invalid && evaluationForm.get('titre')?.touched">
-                        <small style="color: red;">Titre est requis</small>
-                    </div>
-
                 </div>
                 <div class="half">
                     <label>Thématique*</label>

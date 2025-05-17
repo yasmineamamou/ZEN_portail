@@ -1,0 +1,66 @@
+<div class="evaluation-editor">
+    <!-- Left Sidebar -->
+    <div class="sidebar">
+        <h3 class="evaluation-title">{{ evaluationTitle }}</h3>
+        <p class="evaluation-description">{{ evaluationDescription }}</p>
+        <!-- Line separator -->
+        <hr class="divider" />
+        <div class="meta-item">
+            <i class="fas fa-clipboard-list question-icon"></i>
+            <strong>Questions :</strong> {{ questionList.length }}
+        </div>
+        <div class="meta-item">
+            <i class="far fa-light fa-clock"></i>
+            <strong>Temps :</strong> {{ evaluationDuration }} Min
+        </div>
+    </div>
+    <!-- Right Content -->
+    <div class="main-content">
+        <div *ngFor="let question of questionList; let i = index" class="question-box">
+            <!-- Header with background -->
+            <div class="question-header">
+                <h3>QUESTION {{ i + 1 }} :</h3>
+                <div class="icons">
+                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-trash" (click)="questionList.splice(i, 1)"></i>
+                </div>
+            </div>
+            <label>Question</label>
+            <input [(ngModel)]="question.texte" class="question-input" />
+            <label>Description (Optionnel)</label>
+            <textarea [(ngModel)]="question.description" class="description-input"></textarea>
+            <label>Points</label>
+            <input type="number" [(ngModel)]="question.points" min="1" class="points-input" />
+            <!-- Options Section -->
+            <div class="options-container">
+                <div class="option-grid">
+                    <div *ngFor="let option of question.options; let j = index" class="option-row">
+                        <span class="option-label">{{ getOptionLabel(j) }}</span>
+                        <input [(ngModel)]="option.texte" class="option-input" />
+                        <input type="checkbox" [(ngModel)]="option.is_correct" class="option-checkbox" />
+                    </div>
+
+                    <!-- Add Option Button -->
+                    <button type="button" (click)="addOptionToQuestion(i)" class="add-option-btn">
+                        + Ajouter Option
+                    </button>
+                </div>
+            </div>
+
+        </div>
+        <div class="question-preview-box">
+            <div class="question-preview-header">
+                QUESTION {{ questionList.length + 1 }} :
+            </div>
+            <button type="button" (click)="addQuestion()" class="add-question-btn">
+                <i class="fas fa-plus"></i> AJOUTER
+            </button>
+        </div>
+    </div>
+</div>
+<!-- Enregistrer Button -->
+<div class="save-button-container">
+    <button type="button" (click)="submitQuestions()" class="save-btn">
+        Enregistrer
+    </button>
+</div>

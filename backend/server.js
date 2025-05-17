@@ -1832,3 +1832,51 @@ app.post('/api/evaluation-types', (req, res) => {
     console.log("🔄 Type POST received (ignored because saved via evaluation):", type);
     res.status(200).json({ message: "Type received, already handled elsewhere." });
 });
+app.post('/api/questions', async (req, res) => {
+    const { evaluation_id, texte, description, points, ordre } = req.body;
+
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        const result = await pool.request() // ✅ Make sure this is assigned!
+            .input('evaluation_id', sql.Int, evaluation_id)
+            .input('texte', sql.NVarChar, texte)
+            .input('description', sql.NVarChar, description)
+            .input('points', sql.Int, points)
+            .input('ordre', sql.Int, ordre)
+            .query(`
+        INSERT INTO question (evaluation_id, texte, description, points, ordre)
+        OUTPUT INSERTED.id
+        VALUES (@evaluation_id, @texte, @description , @points, @ordre)
+      `);
+
+        const insertedId = result.recordset[0].id;
+        res.status(201).json({ id: insertedId }); // ✅ Return the ID so frontend can use it
+    } catch (err) {
+        console.error('Error adding question:', err);
+        res.status(500).send('Server error');
+    }
+});
+
+app.post('/api/question-options', async (req, res) => {
+    const { question_id, texte, is_correct } = req.body;
+
+    try {
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('question_id', sql.Int, question_id)
+            .input('texte', sql.NVarChar, texte)
+            .input('is_correct', sql.Bit, is_correct)
+            .query(`
+        INSERT INTO question_option (question_id, texte, is_correct)
+        VALUES (@question_id, @texte, @is_correct)
+      `);
+
+        // ✅ Proper response
+        res.status(201).json({ message: 'Option inserted' });
+    } catch (err) {
+        console.error('❌ Error inserting option:', err);
+        res.status(500).json({ error: 'Insert failed' });
+    }
+});
+
